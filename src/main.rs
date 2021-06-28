@@ -1,9 +1,15 @@
 extern crate reqwest;
 extern crate scraper;
+extern crate serde;
+
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 
 use reqwest::blocking;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct Event {
     title: String,
     date: String,
@@ -23,8 +29,40 @@ fn main() {
     let document = scraper::Html::parse_document(&body);
 
     // Parse and print events
-    let events = parse_events(document);
+    let mut events = parse_events(document);
+
+    serialize_events(&events, &Path::new("events.json"));
+
+    events.clear();
+
+    events = deserialize_events(&Path::new("events.json"));
+
     println!("{:#?}", events);
+}
+
+fn serialize_events(events: &Vec<Event>, path: &Path) {
+    let display = path.display();
+
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("Could not create {}: {}", display, why),
+        Ok(file) => file,
+    };
+
+    match file.write_all(serde_json::to_string_pretty(&events).unwrap().as_bytes()) {
+        Err(why) => panic!("Could not write to {}: {}", display, why),
+        Ok(_) => println!("Successfully wrote events to {}", display),
+    };
+}
+
+fn deserialize_events(path: &Path) -> Vec<Event> {
+    let display = path.display();
+
+    let file = match File::open("events.json") {
+        Err(why) => panic!("Could not open {}: {}", display, why),
+        Ok(file) => file,
+    };
+
+    serde_json::from_reader(file).unwrap()
 }
 
 fn parse_events(document: scraper::Html) -> Vec<Event> {

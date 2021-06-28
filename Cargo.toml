@@ -10,3 +10,5 @@ edition = "2018"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 scraper = "0.12.0"
 select = "0.5.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
