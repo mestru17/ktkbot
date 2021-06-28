@@ -2,6 +2,7 @@ extern crate reqwest;
 extern crate scraper;
 extern crate serde;
 
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -9,7 +10,7 @@ use std::path::Path;
 use reqwest::blocking;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Event {
     title: String,
     date: String,
@@ -29,18 +30,22 @@ fn main() {
     let document = scraper::Html::parse_document(&body);
 
     // Parse and print events
-    let mut events = parse_events(document);
+    let events = parse_events(document);
 
-    serialize_events(&events, &Path::new("events.json"));
+    let stored_events = deserialize_events(&Path::new("events.json"));
 
-    events.clear();
+    let diff: HashSet<_> = events.difference(&stored_events).collect();
 
-    events = deserialize_events(&Path::new("events.json"));
-
-    println!("{:#?}", events);
+    if !diff.is_empty() {
+        println!("New events: {:#?}", diff);
+        println!("Updating list of events...");
+        serialize_events(&events, &Path::new("events.json"));
+    } else {
+        println!("No new events");
+    }
 }
 
-fn serialize_events(events: &Vec<Event>, path: &Path) {
+fn serialize_events(events: &HashSet<Event>, path: &Path) {
     let display = path.display();
 
     let mut file = match File::create(&path) {
@@ -54,7 +59,7 @@ fn serialize_events(events: &Vec<Event>, path: &Path) {
     };
 }
 
-fn deserialize_events(path: &Path) -> Vec<Event> {
+fn deserialize_events(path: &Path) -> HashSet<Event> {
     let display = path.display();
 
     let file = match File::open("events.json") {
@@ -65,7 +70,7 @@ fn deserialize_events(path: &Path) -> Vec<Event> {
     serde_json::from_reader(file).unwrap()
 }
 
-fn parse_events(document: scraper::Html) -> Vec<Event> {
+fn parse_events(document: scraper::Html) -> HashSet<Event> {
     // Use same selectors for each event
     let event_selector = scraper::Selector::parse(EVENT_SELECTOR).unwrap();
     let main_info_selector = scraper::Selector::parse(MAIN_INFO_SELECTOR).unwrap();
