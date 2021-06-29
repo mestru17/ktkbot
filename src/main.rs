@@ -18,7 +18,6 @@ struct Event {
     class_info: Vec<String>,
 }
 
-const EVENTS_URL: &str = "https://ktk-tennis.halbooking.dk/newlook/proc_liste.asp?pid=01";
 const EVENTS_FILE: &str = "events.json";
 
 const EVENT_SELECTOR: &str = "tr[class=\"infinite-item\"]";
@@ -26,13 +25,12 @@ const MAIN_INFO_SELECTOR: &str = "td[class=\"liste_wide min992\"]";
 const CLASS_INFO_SELECTOR: &str = "td[class=\"liste_wide min992 holdinfo\"]";
 
 fn main() {
-    // Fetch and parse event page as HTML
-    let response = blocking::get(EVENTS_URL).unwrap();
-    let body = response.text().unwrap();
-    let document = scraper::Html::parse_document(&body);
+    let client = blocking::Client::builder()
+        .cookie_store(true) // Required to properly fetch all events
+        .build()
+        .unwrap();
 
-    // Parse and print events
-    let events = parse_events(document);
+    let events = fetch_all_events(&client);
 
     let file_path = Path::new(EVENTS_FILE);
 
@@ -47,6 +45,41 @@ fn main() {
     } else {
         println!("No new events");
     }
+}
+
+fn fetch_all_events(client: &blocking::Client) -> HashSet<Event> {
+    let mut events: HashSet<Event> = HashSet::new();
+
+    let mut i = 0;
+    loop {
+        // Fetch and parse event page as HTML
+        let url = events_url(i);
+        let new_events = fetch_events(&url[..], &client);
+        if new_events.is_subset(&events) {
+            // No new events, so stop
+            break;
+        }
+        events.extend(new_events);
+
+        i += 1;
+    }
+
+    events
+}
+
+fn events_url(index: u32) -> String {
+    if index == 0 {
+        String::from("https://ktk-tennis.halbooking.dk/newlook/proc_liste.asp?pid=01")
+    } else {
+        format!("https://ktk-tennis.halbooking.dk/newlook/proc_liste.asp?liste=liste1&forrigetype=203&seson=0&scroll={}&pid=01", index - 1)
+    }
+}
+
+fn fetch_events(url: &str, client: &blocking::Client) -> HashSet<Event> {
+    let response = client.get(url).send().unwrap();
+    let body = response.text().unwrap();
+    let document = scraper::Html::parse_document(&body);
+    parse_events(document)
 }
 
 fn serialize_events(events: &HashSet<Event>, path: &Path) {
