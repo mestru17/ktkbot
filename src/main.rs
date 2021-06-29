@@ -18,28 +18,32 @@ struct Event {
     class_info: Vec<String>,
 }
 
+const EVENTS_URL: &str = "https://ktk-tennis.halbooking.dk/newlook/proc_liste.asp?pid=01";
+const EVENTS_FILE: &str = "events.json";
+
 const EVENT_SELECTOR: &str = "tr[class=\"infinite-item\"]";
 const MAIN_INFO_SELECTOR: &str = "td[class=\"liste_wide min992\"]";
 const CLASS_INFO_SELECTOR: &str = "td[class=\"liste_wide min992 holdinfo\"]";
 
 fn main() {
     // Fetch and parse event page as HTML
-    let response =
-        blocking::get("https://ktk-tennis.halbooking.dk/newlook/proc_liste.asp?pid=01").unwrap();
+    let response = blocking::get(EVENTS_URL).unwrap();
     let body = response.text().unwrap();
     let document = scraper::Html::parse_document(&body);
 
     // Parse and print events
     let events = parse_events(document);
 
-    let stored_events = deserialize_events(&Path::new("events.json"));
+    let file_path = Path::new(EVENTS_FILE);
+
+    let stored_events = deserialize_events(&file_path);
 
     let diff: HashSet<_> = events.difference(&stored_events).collect();
 
     if !diff.is_empty() {
         println!("New events: {:#?}", diff);
         println!("Updating list of events...");
-        serialize_events(&events, &Path::new("events.json"));
+        serialize_events(&events, &file_path);
     } else {
         println!("No new events");
     }
@@ -62,7 +66,7 @@ fn serialize_events(events: &HashSet<Event>, path: &Path) {
 fn deserialize_events(path: &Path) -> HashSet<Event> {
     let display = path.display();
 
-    let file = match File::open("events.json") {
+    let file = match File::open(&path) {
         Err(why) => panic!("Could not open {}: {}", display, why),
         Ok(file) => file,
     };
