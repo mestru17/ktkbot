@@ -6,6 +6,8 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use std::thread;
+use std::time;
 
 use reqwest::blocking;
 use serde::{Deserialize, Serialize};
@@ -19,31 +21,48 @@ struct Event {
 }
 
 const EVENTS_FILE: &str = "events.json";
+const FETCH_INTERVAL_SECONDS: u64 = 120;
 
 const EVENT_SELECTOR: &str = "tr[class=\"infinite-item\"]";
 const MAIN_INFO_SELECTOR: &str = "td[class=\"liste_wide min992\"]";
 const CLASS_INFO_SELECTOR: &str = "td[class=\"liste_wide min992 holdinfo\"]";
 
 fn main() {
-    let client = blocking::Client::builder()
-        .cookie_store(true) // Required to properly fetch all events
-        .build()
-        .unwrap();
-
-    let events = fetch_all_events(&client);
-
     let file_path = Path::new(EVENTS_FILE);
+    let fetch_interval = time::Duration::from_secs(FETCH_INTERVAL_SECONDS);
 
-    let stored_events = deserialize_events(&file_path);
+    loop {
+        let client = blocking::Client::builder()
+            .cookie_store(true) // Required to properly fetch all events
+            .build()
+            .unwrap();
 
-    let diff: HashSet<_> = events.difference(&stored_events).collect();
+        println!("Fetching events...");
+        let events = fetch_all_events(&client);
+        println!("Fetched events.");
 
-    if !diff.is_empty() {
-        println!("New events: {:#?}", diff);
-        println!("Updating list of events...");
-        serialize_events(&events, &file_path);
-    } else {
-        println!("No new events");
+        if !file_path.exists() {
+            println!("Found no local list of events.");
+            println!("Saving fetched events to {}...", EVENTS_FILE);
+            serialize_events(&events, &file_path);
+        } else {
+            println!("Loading local list of events from {}...", EVENTS_FILE);
+            let stored_events = deserialize_events(&file_path);
+            println!("Loaded local list of events from {}.", EVENTS_FILE);
+
+            let diff: HashSet<_> = events.difference(&stored_events).collect();
+
+            if !diff.is_empty() {
+                println!("New events: {:#?}", diff);
+                println!("Updating list of events...");
+                serialize_events(&events, &file_path);
+            } else {
+                println!("No new events");
+            }
+        }
+
+        println!("Fetching again in 2 minutes...\n");
+        thread::sleep(fetch_interval);
     }
 }
 
@@ -97,10 +116,8 @@ fn serialize_events(events: &HashSet<Event>, path: &Path) {
 }
 
 fn deserialize_events(path: &Path) -> HashSet<Event> {
-    let display = path.display();
-
     let file = match File::open(&path) {
-        Err(why) => panic!("Could not open {}: {}", display, why),
+        Err(why) => panic!("Could not open {}: {}", path.display(), why),
         Ok(file) => file,
     };
 
