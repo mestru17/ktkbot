@@ -11,6 +11,7 @@ Send push notifications when new tennis events are put up for Kløvermarkens Ten
 - [x] Logging.
 - [ ] Send push notifications.
 - [ ] Sort events by date before outputting.
+- [ ] Command line arguments for configuration.
 - [ ] Asynchronous fetching and termination.
 - [ ] Improve event parsing implementation.
 - [ ] Improve error handling.
