@@ -7,11 +7,12 @@ Send push notifications when new tennis events are put up for Kløvermarkens Ten
 - [x] Identify new events and update local list of events accordingly.
 - [x] Fetch all events including the ones that don't show up on the page until you scroll.
 - [x] Loop infinitely or until terminated.
-- [ ] Handle errors properly.
+- [x] Handle errors properly.
 - [ ] Logging.
 - [ ] Send push notifications.
 - [ ] Sort events by date before outputting.
 - [ ] Asynchronous fetching and termination.
 - [ ] Improve event parsing implementation.
+- [ ] Improve error handling.
 - [ ] Documentation.
 
