@@ -1,6 +1,6 @@
 [package]
 name = "ktkbot"
-version = "0.6.1"
+version = "0.6.2"
 authors = ["mestru17"]
 edition = "2018"
 
@@ -12,3 +12,5 @@ scraper = "0.12.0"
 select = "0.5.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+log = "0.4.14"
+flexi_logger = "0.18.0"

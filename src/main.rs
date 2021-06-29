@@ -1,6 +1,12 @@
+extern crate flexi_logger;
+extern crate log;
 extern crate reqwest;
 extern crate scraper;
 extern crate serde;
+
+use log::{error, info, warn};
+use reqwest::blocking;
+use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
 use std::fmt;
@@ -9,9 +15,6 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::thread;
 use std::time;
-
-use reqwest::blocking;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Event {
@@ -46,49 +49,73 @@ const MAIN_INFO_SELECTOR: &str = "td[class=\"liste_wide min992\"]";
 const CLASS_INFO_SELECTOR: &str = "td[class=\"liste_wide min992 holdinfo\"]";
 
 fn main() {
+    // Initialize logger
+    flexi_logger::Logger::try_with_env_or_str("info")
+        .unwrap()
+        .format(flexi_logger::colored_detailed_format)
+        .log_to_file(flexi_logger::FileSpec::default().directory("logs"))
+        .duplicate_to_stdout(flexi_logger::Duplicate::Info)
+        .print_message()
+        .start()
+        .unwrap();
+
     let file_path = Path::new(EVENTS_FILE);
     let fetch_interval = time::Duration::from_secs(FETCH_INTERVAL_SECONDS);
 
+    info!("Now running.");
     loop {
         let client = blocking::Client::builder()
             .cookie_store(true) // Required to properly fetch all events
             .build()
             .unwrap();
+        info!("Created HTTP client.");
 
-        println!("Fetching events...");
+        info!("Fetching events...");
         let events = match fetch_all_events(&client) {
-            Err(why) => panic!("Failed to fetch events: {}", why),
+            Err(why) => {
+                error!("Failed to fetch events: {}.", why);
+                panic!();
+            }
             Ok(events) => events,
         };
-        println!("Fetched events.");
+        info!("Fetched events.");
 
-        println!("Loading local list of events from {}...", EVENTS_FILE);
+        info!("Loading local list of events from {}...", EVENTS_FILE);
         match deserialize_events(&file_path) {
             Err(_) => {
-                println!("Did not find a local list of events.");
-                println!("Saving fetched events to {}...", EVENTS_FILE);
+                warn!(
+                    "Did not find a local list of events. Saving fetched events to {}...",
+                    EVENTS_FILE
+                );
                 if let Err(why) = serialize_events(&events, &file_path) {
-                    panic!("Failed to serialize events: {}", why);
+                    error!("Failed to serialize events: {}", why);
+                    panic!();
                 }
+                info!("Successfully saved fetched events to {}.", EVENTS_FILE);
             }
             Ok(stored_events) => {
-                println!("Loaded local list of events from {}.", EVENTS_FILE);
+                info!("Loaded local list of events from {}.", EVENTS_FILE);
 
                 let diff: HashSet<_> = events.difference(&stored_events).collect();
 
                 if !diff.is_empty() {
-                    println!("New events: {:#?}", diff);
-                    println!("Updating list of events...");
+                    info!("Found new events: {:?}", diff);
+                    info!("Updating local list of events...");
                     if let Err(why) = serialize_events(&events, &file_path) {
-                        panic!("Failed to serialize events: {}", why);
+                        error!("Failed to serialize events: {}", why);
+                        panic!();
                     }
+                    info!("Local list of events updated.")
                 } else {
-                    println!("No new events");
+                    info!("No new events.");
                 }
             }
         };
 
-        println!("Fetching again in 2 minutes...\n");
+        // Close all connections before suspending
+        drop(client);
+
+        info!("Fetching again in 2 minutes...\n");
         thread::sleep(fetch_interval);
     }
 }
