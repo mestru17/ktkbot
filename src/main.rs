@@ -41,8 +41,83 @@ impl From<String> for ParseError {
     }
 }
 
+#[derive(Serialize)]
+struct Notification {
+    token: String,
+    user: String,
+    title: Option<String>,
+    message: String,
+    html: Option<u32>,      // Set to 1 to enable html in message
+    monospace: Option<u32>, // Set to 1 to enable monospace font in message
+}
+
+impl Notification {
+    fn builder(token: &str, user: &str, message: &str) -> NotificationBuilder {
+        NotificationBuilder::new(token, user, message)
+    }
+
+    fn send(self) -> Result<blocking::Response, reqwest::Error> {
+        blocking::Client::new()
+            .post(PUSHOVER_API_URL)
+            .form(&self)
+            .send()
+    }
+}
+
+struct NotificationBuilder {
+    token: String,
+    user: String,
+    title: Option<String>,
+    message: String,
+    html: Option<u32>,      // Set to 1 to enable html in message
+    monospace: Option<u32>, // Set to 1 to enable monospace font in message
+}
+
+impl NotificationBuilder {
+    fn new(token: &str, user: &str, message: &str) -> NotificationBuilder {
+        NotificationBuilder {
+            token: String::from(token),
+            user: String::from(user),
+            title: None,
+            message: String::from(message),
+            html: None,
+            monospace: None,
+        }
+    }
+
+    fn title(mut self, title: &str) -> NotificationBuilder {
+        self.title = Some(String::from(title));
+        self
+    }
+
+    fn html(mut self, html: bool) -> NotificationBuilder {
+        self.html = if html { Some(1) } else { None };
+        self
+    }
+
+    fn monospace(mut self, monospace: bool) -> NotificationBuilder {
+        self.monospace = if monospace { Some(1) } else { None };
+        self
+    }
+
+    fn build(self) -> Notification {
+        Notification {
+            token: self.token,
+            user: self.user,
+            title: self.title,
+            message: self.message,
+            html: self.html,
+            monospace: self.monospace,
+        }
+    }
+}
+
 const EVENTS_FILE: &str = "events.json";
 const FETCH_INTERVAL_SECONDS: u64 = 120;
+
+const PUSHOVER_API_URL: &str = "https://api.pushover.net/1/messages.json";
+const PUSHOVER_API_KEY: &str = "***REMOVED***"; // FIXME: Don't store api key in program
+const PUSHOVER_GROUP_KEY: &str = "***REMOVED***";
 
 const EVENT_SELECTOR: &str = "tr[class=\"infinite-item\"]";
 const MAIN_INFO_SELECTOR: &str = "td[class=\"liste_wide min992\"]";
@@ -99,7 +174,15 @@ fn main() {
                 let diff: HashSet<_> = events.difference(&stored_events).collect();
 
                 if !diff.is_empty() {
-                    info!("Found new events: {:?}", diff);
+                    info!("Found {} new events.", diff.len());
+
+                    info!("Sending push notification...");
+                    if let Err(why) = send_push_notification(&diff) {
+                        error!("Failed to send push notification: {}", why);
+                        panic!();
+                    }
+                    info!("Successfully sent push notification.");
+
                     info!("Updating local list of events...");
                     if let Err(why) = serialize_events(&events, &file_path) {
                         error!("Failed to serialize events: {}", why);
@@ -171,6 +254,18 @@ fn deserialize_events(path: &Path) -> Result<HashSet<Event>, Box<dyn std::error:
     let file = File::open(&path)?;
     let events: HashSet<Event> = serde_json::from_reader(file)?;
     Ok(events)
+}
+
+fn send_push_notification(events: &HashSet<&Event>) -> Result<blocking::Response, reqwest::Error> {
+    let mut message = String::from("<u>Der er blevet lagt nye tider op</u>:");
+    for event in events {
+        message.push_str(&format!("\n- <b>{}</b>: {} {}", event.title, event.date, event.time)[..]);
+    }
+    Notification::builder(PUSHOVER_API_KEY, PUSHOVER_GROUP_KEY, &message[..])
+        .title("Nye tider lagt op!")
+        .html(true)
+        .build()
+        .send()
 }
 
 fn parse_events(document: scraper::Html) -> Result<HashSet<Event>, ParseError> {

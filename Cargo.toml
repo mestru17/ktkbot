@@ -1,6 +1,6 @@
 [package]
 name = "ktkbot"
-version = "0.6.2"
+version = "0.7.0"
 authors = ["mestru17"]
 edition = "2018"
 

@@ -9,7 +9,9 @@ Send push notifications when new tennis events are put up for Kløvermarkens Ten
 - [x] Loop infinitely or until terminated.
 - [x] Handle errors properly.
 - [x] Logging.
-- [ ] Send push notifications.
+- [x] Send push notifications.
+- [ ] Cache events in memory.
+- [ ] Restructure code.
 - [ ] Sort events by date before outputting.
 - [ ] Command line arguments for configuration.
 - [ ] Asynchronous fetching and termination.
