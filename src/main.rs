@@ -1,9 +1,3 @@
-extern crate flexi_logger;
-extern crate log;
-extern crate reqwest;
-extern crate scraper;
-extern crate serde;
-
 use log::{error, info, warn};
 use reqwest::blocking;
 use serde::{Deserialize, Serialize};
