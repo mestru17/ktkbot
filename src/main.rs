@@ -112,95 +112,159 @@ impl NotificationBuilder {
     }
 }
 
+const LOG_SPEC: &str = "info";
+const LOG_DIRECTORY: &str = "logs";
+
 const EVENTS_FILE: &str = "events.json";
 const FETCH_INTERVAL_SECONDS: u64 = 120;
 
 const PUSHOVER_API_URL: &str = "https://api.pushover.net/1/messages.json";
 const PUSHOVER_API_KEY: &str = "***REMOVED***"; // FIXME: Don't store api key in program
-const PUSHOVER_GROUP_KEY: &str = "***REMOVED***";
+const PUSHOVER_GROUP_KEY: &str = "***REMOVED***"; // FIXME: Don't store user key in program
 
 const EVENT_SELECTOR: &str = "tr[class=\"infinite-item\"]";
 const MAIN_INFO_SELECTOR: &str = "td[class=\"liste_wide min992\"]";
 const CLASS_INFO_SELECTOR: &str = "td[class=\"liste_wide min992 holdinfo\"]";
 
 fn main() {
-    // Initialize logger
-    flexi_logger::Logger::try_with_env_or_str("info")
-        .unwrap()
+    let _logger_handle = init_logger(LOG_SPEC, LOG_DIRECTORY)
+        .unwrap_or_else(|error| panic!("Failed to initialize logger: {}", error));
+
+    let events_file_path = Path::new(EVENTS_FILE);
+    let fetch_interval = time::Duration::from_secs(FETCH_INTERVAL_SECONDS);
+
+    info!("Loading local list of events from {}...", EVENTS_FILE);
+
+    // Try to load known events from local file. If it fails, then fetch the events and write them
+    // to the file. If writing fails, then continue with in-memory list `stored_events`.
+    let mut stored_events = deserialize_events(events_file_path).unwrap_or_else(|error| {
+        warn!("Failed to load local list of events: {}", error);
+        warn!(
+            "Fetching events and creating new local list at {} instead...",
+            EVENTS_FILE
+        );
+
+        let client = new_client().unwrap_or_else(crash(|error| {
+            format!("Failed to create HTTP client: {}", error)
+        }));
+        let events = fetch_all_events(&client)
+            .unwrap_or_else(crash(|error| format!("Failed to fetch events: {}", error)));
+
+        info!("Fetched events. Writing them to {}...", EVENTS_FILE);
+
+        if let Err(error) = serialize_events(&events, &events_file_path) {
+            warn!(
+                "Failed to save fetched events to {}: {}",
+                EVENTS_FILE, error
+            );
+            warn!("Continuing without saving events to disk, only storing them in memory.");
+        } else {
+            info!("Wrote events to {}.", EVENTS_FILE);
+        }
+
+        events
+    });
+
+    // Continuously fetch events and compare to local list of events. If there are any new ones,
+    // then send a push notification and update local list.
+    let mut running = false;
+    loop {
+        if running {
+            info!("Fetching again in 2 minutes...\n");
+            thread::sleep(fetch_interval);
+        } else {
+            running = true;
+            info!("Now running.");
+        }
+
+        info!("Creating HTTP client...");
+
+        let client = new_client().unwrap_or_else(crash(|error| {
+            format!("Failed to create HTTP client: {}", error)
+        }));
+
+        info!("Created HTTP client. Fetching events...");
+
+        let events = fetch_all_events(&client)
+            .unwrap_or_else(crash(|error| format!("Failed to fetch events: {}", error)));
+
+        info!("Fetched events. Comparing to local list of events...");
+
+        let diff: HashSet<_> = events.difference(&stored_events).collect();
+
+        if diff.is_empty() {
+            info!("There are no new events.");
+            continue;
+        }
+
+        info!(
+            "There are {} new events. Sending push notification...",
+            diff.len()
+        );
+
+        // TODO: Handle response - see [Being Friendly to our API](https://pushover.net/api#friendly)
+        let response = send_push_notification(&diff).unwrap_or_else(crash(|error| {
+            format!("Failed to send push notification: {}", error)
+        }));
+
+        info!("Sent push notification. Updating local list of events...");
+
+        stored_events = events;
+        if let Err(why) = serialize_events(&stored_events, &events_file_path) {
+            error!("Failed to serialize events: {}", why);
+            panic!();
+        }
+
+        info!("Updated local list of events.");
+    }
+}
+
+fn init_logger(
+    spec: &str,
+    directory: &str,
+) -> Result<flexi_logger::LoggerHandle, flexi_logger::FlexiLoggerError> {
+    flexi_logger::Logger::try_with_env_or_str(spec)?
         .format(flexi_logger::colored_detailed_format)
-        .log_to_file(flexi_logger::FileSpec::default().directory("logs"))
+        .log_to_file(flexi_logger::FileSpec::default().directory(directory))
         .duplicate_to_stdout(flexi_logger::Duplicate::Info)
         .print_message()
         .start()
-        .unwrap();
+}
 
-    let file_path = Path::new(EVENTS_FILE);
-    let fetch_interval = time::Duration::from_secs(FETCH_INTERVAL_SECONDS);
-
-    info!("Now running.");
-    loop {
-        let client = blocking::Client::builder()
-            .cookie_store(true) // Required to properly fetch all events
-            .build()
-            .unwrap();
-        info!("Created HTTP client.");
-
-        info!("Fetching events...");
-        let events = match fetch_all_events(&client) {
-            Err(why) => {
-                error!("Failed to fetch events: {}.", why);
-                panic!();
-            }
-            Ok(events) => events,
-        };
-        info!("Fetched events.");
-
-        info!("Loading local list of events from {}...", EVENTS_FILE);
-        match deserialize_events(&file_path) {
-            Err(_) => {
-                warn!(
-                    "Did not find a local list of events. Saving fetched events to {}...",
-                    EVENTS_FILE
-                );
-                if let Err(why) = serialize_events(&events, &file_path) {
-                    error!("Failed to serialize events: {}", why);
-                    panic!();
-                }
-                info!("Successfully saved fetched events to {}.", EVENTS_FILE);
-            }
-            Ok(stored_events) => {
-                info!("Loaded local list of events from {}.", EVENTS_FILE);
-
-                let diff: HashSet<_> = events.difference(&stored_events).collect();
-
-                if !diff.is_empty() {
-                    info!("Found {} new events.", diff.len());
-
-                    info!("Sending push notification...");
-                    if let Err(why) = send_push_notification(&diff) {
-                        error!("Failed to send push notification: {}", why);
-                        panic!();
-                    }
-                    info!("Successfully sent push notification.");
-
-                    info!("Updating local list of events...");
-                    if let Err(why) = serialize_events(&events, &file_path) {
-                        error!("Failed to serialize events: {}", why);
-                        panic!();
-                    }
-                    info!("Local list of events updated.")
-                } else {
-                    info!("No new events.");
-                }
-            }
-        };
-
-        // Close all connections before suspending
-        drop(client);
-
-        info!("Fetching again in 2 minutes...\n");
-        thread::sleep(fetch_interval);
+fn crash<F, E, T>(f: F) -> impl Fn(E) -> T
+where
+    F: Fn(E) -> String,
+    E: std::fmt::Display,
+{
+    move |error| {
+        let message = f(error);
+        error!("{}", message);
+        panic!("{}", message);
     }
+}
+
+fn serialize_events(
+    events: &HashSet<Event>,
+    path: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let json = serde_json::to_string_pretty(&events)?;
+
+    let mut file = File::create(&path)?;
+    file.write_all(json.as_bytes())?;
+
+    Ok(())
+}
+
+fn deserialize_events(path: &Path) -> Result<HashSet<Event>, Box<dyn std::error::Error>> {
+    let file = File::open(&path)?;
+    let events: HashSet<Event> = serde_json::from_reader(file)?;
+    Ok(events)
+}
+
+fn new_client() -> reqwest::Result<blocking::Client> {
+    blocking::Client::builder()
+        .cookie_store(true) // Required to properly fetch all events
+        .build()
 }
 
 fn fetch_all_events(client: &blocking::Client) -> Result<HashSet<Event>, ParseError> {
@@ -236,24 +300,6 @@ fn fetch_events(url: &str, client: &blocking::Client) -> Result<HashSet<Event>, 
     let body = response.text().unwrap();
     let document = scraper::Html::parse_document(&body);
     parse_events(document)
-}
-
-fn serialize_events(
-    events: &HashSet<Event>,
-    path: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let json = serde_json::to_string_pretty(&events)?;
-
-    let mut file = File::create(&path)?;
-    file.write_all(json.as_bytes())?;
-
-    Ok(())
-}
-
-fn deserialize_events(path: &Path) -> Result<HashSet<Event>, Box<dyn std::error::Error>> {
-    let file = File::open(&path)?;
-    let events: HashSet<Event> = serde_json::from_reader(file)?;
-    Ok(events)
 }
 
 fn send_push_notification(events: &HashSet<&Event>) -> Result<blocking::Response, reqwest::Error> {

@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "ktkbot"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "flexi_logger",
  "log",
