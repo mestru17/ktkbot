@@ -1,8 +1,5 @@
-use log::{error, info, warn};
-use reqwest::blocking;
-use serde::{Deserialize, Serialize};
-
-use std::collections::HashSet;
+use std::cmp;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
@@ -10,12 +7,40 @@ use std::path::Path;
 use std::thread;
 use std::time;
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+use chrono::TimeZone;
+use log::{error, info, warn};
+use reqwest::blocking;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Event {
     title: String,
-    date: String,
-    time: String,
+    date_time: chrono::DateTime<chrono::FixedOffset>,
     class_info: Vec<String>,
+}
+
+impl Event {
+    fn new() -> Event {
+        Event {
+            title: String::default(),
+            date_time: chrono::FixedOffset::east(2 * 3600)
+                .ymd(2021, 6, 30)
+                .and_hms(0, 0, 0),
+            class_info: Vec::default(),
+        }
+    }
+}
+
+impl PartialOrd for Event {
+    fn partial_cmp(&self, other: &Event) -> Option<cmp::Ordering> {
+        self.date_time.partial_cmp(&other.date_time)
+    }
+}
+
+impl Ord for Event {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.date_time.cmp(&other.date_time)
+    }
 }
 
 #[derive(Debug)]
@@ -164,7 +189,7 @@ fn main() {
     let mut running = false;
     loop {
         if running {
-            info!("Fetching again in 2 minutes...\n");
+            info!("Fetching again in 2 minutes.\n");
             thread::sleep(fetch_interval);
         } else {
             running = true;
@@ -184,7 +209,7 @@ fn main() {
 
         info!("Fetched events. Comparing to local list of events...");
 
-        let diff: HashSet<_> = events.difference(&stored_events).collect();
+        let mut diff: Vec<_> = events.difference(&stored_events).collect();
 
         if diff.is_empty() {
             info!("There are no new events.");
@@ -192,9 +217,11 @@ fn main() {
         }
 
         info!(
-            "There are {} new events. Sending push notification...",
+            "There are {} new events. Sorting and sending push notification...",
             diff.len()
         );
+
+        diff.sort();
 
         // TODO: Handle response - see [Being Friendly to our API](https://pushover.net/api#friendly)
         let response = send_push_notification(&diff).unwrap_or_else(crash(|error| {
@@ -296,10 +323,16 @@ fn fetch_events(url: &str, client: &blocking::Client) -> Result<HashSet<Event>, 
     parse_events(document)
 }
 
-fn send_push_notification(events: &HashSet<&Event>) -> Result<blocking::Response, reqwest::Error> {
+fn send_push_notification(events: &Vec<&Event>) -> Result<blocking::Response, reqwest::Error> {
     let mut message = String::from("<u>Der er blevet lagt nye tider op</u>:");
     for event in events {
-        message.push_str(&format!("\n- <b>{}</b>: {} {}", event.title, event.date, event.time)[..]);
+        message.push_str(
+            &format!(
+                "\n- <b>{}</b>: {}",
+                event.title,
+                event.date_time.format("%a %e %b %Y"),
+            )[..],
+        );
     }
     Notification::builder(PUSHOVER_API_KEY, PUSHOVER_GROUP_KEY, &message[..])
         .title("Nye tider lagt op!")
@@ -325,7 +358,7 @@ fn parse_event(
     main_info_selector: &scraper::Selector,
     class_info_selector: &scraper::Selector,
 ) -> Result<Event, ParseError> {
-    let mut event: Event = Default::default();
+    let mut event: Event = Event::new();
 
     parse_main_info(row, main_info_selector, &mut event)?;
     parse_class_info(row, class_info_selector, &mut event);
@@ -341,27 +374,55 @@ fn parse_main_info(
     for line in row.select(&selector) {
         let text = parse_text(line);
 
-        match text.len() {
-            3 => {
-                event.title = String::from(text[0]);
-                event.date = String::from(text[1]);
-                event.time = String::from(text[2]);
-            }
-            5 => {
-                event.title = String::from(text[0]);
-                event.date = String::from(text[3]);
-                event.time = String::from(text[4]);
-            }
+        let (title, date, time) = match text.len() {
+            3 => (text[0], text[1], text[2]),
+            5 => (text[0], text[3], text[4]),
             _ => {
                 return Err(format!(
                     "Expected event main info to have 3 or 5 lines, found {:?}",
                     text
                 ))?
             }
-        }
+        };
+
+        event.title = String::from(title);
+
+        let months = months();
+
+        let (day, month, year): (u32, u32, i32) = match (&date[4..6]).parse() {
+            Ok(day) => (
+                day,
+                months.get(&date[8..11]).unwrap().to_owned(),
+                (&date[12..]).parse().unwrap(),
+            ),
+            Err(_) => (
+                (&date[4..5]).parse().unwrap(),
+                months.get(&date[7..10]).unwrap().to_owned(),
+                (&date[11..]).parse().unwrap(),
+            ),
+        };
+
+        let hours: u32 = (&time[..2]).parse().unwrap();
+        let minutes: u32 = (&time[3..5]).parse().unwrap();
+
+        event.date_time = chrono::FixedOffset::east(2 * 3600)
+            .ymd(year, month, day)
+            .and_hms(hours, minutes, 0);
     }
 
     Ok(())
+}
+
+fn months() -> HashMap<String, u32> {
+    let names = vec![
+        "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+    ];
+    let nums: Vec<u32> = (1..12).collect();
+    names
+        .into_iter()
+        .map(|m| String::from(m))
+        .zip(nums.into_iter())
+        .collect()
 }
 
 fn parse_class_info(row: scraper::ElementRef, selector: &scraper::Selector, event: &mut Event) {
