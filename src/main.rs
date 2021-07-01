@@ -1,21 +1,27 @@
 use std::cmp;
 use std::collections::{HashMap, HashSet};
-use std::fmt;
+use std::fmt::{self, Display};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::thread;
 use std::time;
 
-use chrono::TimeZone;
+use blocking::{Client, Response};
+use chrono::{DateTime, FixedOffset, TimeZone};
+use cmp::Ordering;
+use flexi_logger::{Duplicate, FileSpec, FlexiLoggerError, Logger, LoggerHandle};
+use fmt::Formatter;
 use log::{error, info, warn};
 use reqwest::blocking;
+use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
+use time::Duration;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Event {
     title: String,
-    date_time: chrono::DateTime<chrono::FixedOffset>,
+    date_time: DateTime<FixedOffset>,
     class_info: Vec<String>,
 }
 
@@ -23,7 +29,7 @@ impl Event {
     fn new() -> Event {
         Event {
             title: String::default(),
-            date_time: chrono::FixedOffset::east(2 * 3600)
+            date_time: FixedOffset::east(2 * 3600)
                 .ymd(2021, 6, 30)
                 .and_hms(0, 0, 0),
             class_info: Vec::default(),
@@ -32,30 +38,30 @@ impl Event {
 }
 
 impl PartialOrd for Event {
-    fn partial_cmp(&self, other: &Event) -> Option<cmp::Ordering> {
+    fn partial_cmp(&self, other: &Event) -> Option<Ordering> {
         self.date_time.partial_cmp(&other.date_time)
     }
 }
 
 impl Ord for Event {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.date_time.cmp(&other.date_time)
     }
 }
 
 struct EventParser {
-    event_selector: scraper::Selector,
-    main_info_selector: scraper::Selector,
-    class_info_selector: scraper::Selector,
+    event_selector: Selector,
+    main_info_selector: Selector,
+    class_info_selector: Selector,
     month_lookup: HashMap<String, u32>,
 }
 
 impl EventParser {
     fn new() -> EventParser {
         EventParser {
-            event_selector: scraper::Selector::parse(EVENT_SELECTOR).unwrap(),
-            main_info_selector: scraper::Selector::parse(MAIN_INFO_SELECTOR).unwrap(),
-            class_info_selector: scraper::Selector::parse(CLASS_INFO_SELECTOR).unwrap(),
+            event_selector: Selector::parse(EVENT_SELECTOR).unwrap(),
+            main_info_selector: Selector::parse(MAIN_INFO_SELECTOR).unwrap(),
+            class_info_selector: Selector::parse(CLASS_INFO_SELECTOR).unwrap(),
             month_lookup: [
                 "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
             ]
@@ -67,14 +73,14 @@ impl EventParser {
         }
     }
 
-    fn parse_all(&self, document: scraper::Html) -> Result<HashSet<Event>, ParseError> {
+    fn parse_all(&self, document: Html) -> Result<HashSet<Event>, ParseError> {
         document
             .select(&self.event_selector)
             .map(|row| self.parse_one(row))
             .collect()
     }
 
-    fn parse_one(&self, row: scraper::ElementRef) -> Result<Event, ParseError> {
+    fn parse_one(&self, row: ElementRef) -> Result<Event, ParseError> {
         let mut event: Event = Event::new();
 
         self.parse_main_info(row, &mut event)?;
@@ -83,11 +89,7 @@ impl EventParser {
         Ok(event)
     }
 
-    fn parse_main_info(
-        &self,
-        row: scraper::ElementRef,
-        event: &mut Event,
-    ) -> Result<(), ParseError> {
+    fn parse_main_info(&self, row: ElementRef, event: &mut Event) -> Result<(), ParseError> {
         for line in row.select(&self.main_info_selector) {
             let text = EventParser::parse_text(line);
 
@@ -120,7 +122,7 @@ impl EventParser {
             let hours: u32 = (&time[..2]).parse().unwrap();
             let minutes: u32 = (&time[3..5]).parse().unwrap();
 
-            event.date_time = chrono::FixedOffset::east(2 * 3600)
+            event.date_time = FixedOffset::east(2 * 3600)
                 .ymd(year, month, day)
                 .and_hms(hours, minutes, 0);
         }
@@ -128,14 +130,14 @@ impl EventParser {
         Ok(())
     }
 
-    fn parse_class_info(&self, row: scraper::ElementRef, event: &mut Event) {
+    fn parse_class_info(&self, row: ElementRef, event: &mut Event) {
         for line in row.select(&self.class_info_selector) {
             let text = EventParser::parse_text(line);
             event.class_info = text.iter().map(|t| t.to_string()).collect();
         }
     }
 
-    fn parse_text(line: scraper::ElementRef) -> Vec<&str> {
+    fn parse_text(line: ElementRef) -> Vec<&str> {
         line.text()
             .map(|t| t.trim())
             .filter(|t| !t.is_empty())
@@ -149,7 +151,7 @@ struct ParseError {
 }
 
 impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "Failed to parse event: {}", self.message)
     }
 }
@@ -175,11 +177,8 @@ impl Notification {
         NotificationBuilder::new(token, user, message)
     }
 
-    fn send(self) -> Result<blocking::Response, reqwest::Error> {
-        blocking::Client::new()
-            .post(PUSHOVER_API_URL)
-            .form(&self)
-            .send()
+    fn send(self) -> Result<Response, reqwest::Error> {
+        Client::new().post(PUSHOVER_API_URL).form(&self).send()
     }
 }
 
@@ -250,7 +249,7 @@ fn main() {
         .unwrap_or_else(|error| panic!("Failed to initialize logger: {}", error));
 
     let events_file_path = Path::new(EVENTS_FILE);
-    let fetch_interval = time::Duration::from_secs(FETCH_INTERVAL_SECONDS);
+    let fetch_interval = Duration::from_secs(FETCH_INTERVAL_SECONDS);
 
     let event_parser = EventParser::new();
 
@@ -342,14 +341,11 @@ fn main() {
     }
 }
 
-fn init_logger(
-    spec: &str,
-    directory: &str,
-) -> Result<flexi_logger::LoggerHandle, flexi_logger::FlexiLoggerError> {
-    flexi_logger::Logger::try_with_env_or_str(spec)?
+fn init_logger(spec: &str, directory: &str) -> Result<LoggerHandle, FlexiLoggerError> {
+    Logger::try_with_env_or_str(spec)?
         .format(flexi_logger::colored_detailed_format)
-        .log_to_file(flexi_logger::FileSpec::default().directory(directory))
-        .duplicate_to_stdout(flexi_logger::Duplicate::Info)
+        .log_to_file(FileSpec::default().directory(directory))
+        .duplicate_to_stdout(Duplicate::Info)
         .print_message()
         .start()
 }
@@ -357,7 +353,7 @@ fn init_logger(
 fn crash<F, E, T>(f: F) -> impl Fn(E) -> T
 where
     F: Fn(E) -> String,
-    E: std::fmt::Display,
+    E: Display,
 {
     move |error| {
         let message = f(error);
@@ -384,16 +380,13 @@ fn deserialize_events(path: &Path) -> Result<HashSet<Event>, Box<dyn std::error:
     Ok(events)
 }
 
-fn new_client() -> reqwest::Result<blocking::Client> {
-    blocking::Client::builder()
+fn new_client() -> reqwest::Result<Client> {
+    Client::builder()
         .cookie_store(true) // Required to properly fetch all events
         .build()
 }
 
-fn fetch_all_events(
-    client: &blocking::Client,
-    parser: &EventParser,
-) -> Result<HashSet<Event>, ParseError> {
+fn fetch_all_events(client: &Client, parser: &EventParser) -> Result<HashSet<Event>, ParseError> {
     let mut events: HashSet<Event> = HashSet::new();
 
     let mut i = 0;
@@ -423,16 +416,16 @@ fn events_url(index: u32) -> String {
 
 fn fetch_events(
     url: &str,
-    client: &blocking::Client,
+    client: &Client,
     parser: &EventParser,
 ) -> Result<HashSet<Event>, ParseError> {
     let response = client.get(url).send().unwrap();
     let body = response.text().unwrap();
-    let document = scraper::Html::parse_document(&body);
+    let document = Html::parse_document(&body);
     parser.parse_all(document)
 }
 
-fn send_push_notification(events: &Vec<&Event>) -> Result<blocking::Response, reqwest::Error> {
+fn send_push_notification(events: &Vec<&Event>) -> Result<Response, reqwest::Error> {
     let mut message = String::from("<u>Der er blevet lagt nye tider op</u>:");
     for event in events {
         message.push_str(
