@@ -1,11 +1,13 @@
-use std::cmp;
-use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display};
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::Path;
-use std::thread;
-use std::time::Duration;
+use std::{
+    cmp,
+    collections::{HashMap, HashSet},
+    fmt::{self, Display},
+    fs::File,
+    io::prelude::*,
+    path::Path,
+    thread,
+    time::Duration,
+};
 
 use blocking::{Client, Response};
 use chrono::{DateTime, FixedOffset, TimeZone};
