@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::thread;
-use std::time;
+use std::time::Duration;
 
 use blocking::{Client, Response};
 use chrono::{DateTime, FixedOffset, TimeZone};
@@ -16,7 +16,6 @@ use log::{error, info, warn};
 use reqwest::blocking;
 use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
-use time::Duration;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Event {
