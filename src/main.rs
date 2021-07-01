@@ -43,6 +43,105 @@ impl Ord for Event {
     }
 }
 
+struct EventParser {
+    event_selector: scraper::Selector,
+    main_info_selector: scraper::Selector,
+    class_info_selector: scraper::Selector,
+    month_lookup: HashMap<String, u32>,
+}
+
+impl EventParser {
+    fn new() -> EventParser {
+        EventParser {
+            event_selector: scraper::Selector::parse(EVENT_SELECTOR).unwrap(),
+            main_info_selector: scraper::Selector::parse(MAIN_INFO_SELECTOR).unwrap(),
+            class_info_selector: scraper::Selector::parse(CLASS_INFO_SELECTOR).unwrap(),
+            month_lookup: vec![
+                "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .zip((1..12).into_iter())
+            .collect(),
+        }
+    }
+
+    fn parse_all(&self, document: scraper::Html) -> Result<HashSet<Event>, ParseError> {
+        document
+            .select(&self.event_selector)
+            .map(|row| self.parse_one(row))
+            .collect()
+    }
+
+    fn parse_one(&self, row: scraper::ElementRef) -> Result<Event, ParseError> {
+        let mut event: Event = Event::new();
+
+        self.parse_main_info(row, &mut event)?;
+        self.parse_class_info(row, &mut event);
+
+        Ok(event)
+    }
+
+    fn parse_main_info(
+        &self,
+        row: scraper::ElementRef,
+        event: &mut Event,
+    ) -> Result<(), ParseError> {
+        for line in row.select(&self.main_info_selector) {
+            let text = EventParser::parse_text(line);
+
+            let (title, date, time) = match text.len() {
+                3 => (text[0], text[1], text[2]),
+                5 => (text[0], text[3], text[4]),
+                _ => {
+                    return Err(format!(
+                        "Expected event main info to have 3 or 5 lines, found {:?}",
+                        text
+                    ))?
+                }
+            };
+
+            event.title = String::from(title);
+
+            let (day, month, year): (u32, u32, i32) = match (&date[4..6]).parse() {
+                Ok(day) => (
+                    day,
+                    self.month_lookup.get(&date[8..11]).unwrap().to_owned(),
+                    (&date[12..]).parse().unwrap(),
+                ),
+                Err(_) => (
+                    (&date[4..5]).parse().unwrap(),
+                    self.month_lookup.get(&date[7..10]).unwrap().to_owned(),
+                    (&date[11..]).parse().unwrap(),
+                ),
+            };
+
+            let hours: u32 = (&time[..2]).parse().unwrap();
+            let minutes: u32 = (&time[3..5]).parse().unwrap();
+
+            event.date_time = chrono::FixedOffset::east(2 * 3600)
+                .ymd(year, month, day)
+                .and_hms(hours, minutes, 0);
+        }
+
+        Ok(())
+    }
+
+    fn parse_class_info(&self, row: scraper::ElementRef, event: &mut Event) {
+        for line in row.select(&self.class_info_selector) {
+            let text = EventParser::parse_text(line);
+            event.class_info = text.iter().map(|t| t.to_string()).collect();
+        }
+    }
+
+    fn parse_text(line: scraper::ElementRef) -> Vec<&str> {
+        line.text()
+            .map(|t| t.trim())
+            .filter(|t| !t.is_empty())
+            .collect()
+    }
+}
+
 #[derive(Debug)]
 struct ParseError {
     message: String,
@@ -152,6 +251,8 @@ fn main() {
     let events_file_path = Path::new(EVENTS_FILE);
     let fetch_interval = time::Duration::from_secs(FETCH_INTERVAL_SECONDS);
 
+    let event_parser = EventParser::new();
+
     info!("Loading local list of events from {}...", EVENTS_FILE);
 
     // Try to load known events from local file. If it fails, then fetch the events and write them
@@ -166,7 +267,7 @@ fn main() {
         let client = new_client().unwrap_or_else(crash(|error| {
             format!("Failed to create HTTP client: {}", error)
         }));
-        let events = fetch_all_events(&client)
+        let events = fetch_all_events(&client, &event_parser)
             .unwrap_or_else(crash(|error| format!("Failed to fetch events: {}", error)));
 
         info!("Fetched events. Writing them to {}...", EVENTS_FILE);
@@ -204,7 +305,7 @@ fn main() {
 
         info!("Created HTTP client. Fetching events...");
 
-        let events = fetch_all_events(&client)
+        let events = fetch_all_events(&client, &event_parser)
             .unwrap_or_else(crash(|error| format!("Failed to fetch events: {}", error)));
 
         info!("Fetched events. Comparing to local list of events...");
@@ -288,14 +389,17 @@ fn new_client() -> reqwest::Result<blocking::Client> {
         .build()
 }
 
-fn fetch_all_events(client: &blocking::Client) -> Result<HashSet<Event>, ParseError> {
+fn fetch_all_events(
+    client: &blocking::Client,
+    parser: &EventParser,
+) -> Result<HashSet<Event>, ParseError> {
     let mut events: HashSet<Event> = HashSet::new();
 
     let mut i = 0;
     loop {
         // Fetch and parse event page as HTML
         let url = events_url(i);
-        let new_events = fetch_events(&url[..], &client)?;
+        let new_events = fetch_events(url.as_str(), client, parser)?;
         if new_events.is_subset(&events) {
             // No new events, so stop
             break;
@@ -316,11 +420,15 @@ fn events_url(index: u32) -> String {
     }
 }
 
-fn fetch_events(url: &str, client: &blocking::Client) -> Result<HashSet<Event>, ParseError> {
+fn fetch_events(
+    url: &str,
+    client: &blocking::Client,
+    parser: &EventParser,
+) -> Result<HashSet<Event>, ParseError> {
     let response = client.get(url).send().unwrap();
     let body = response.text().unwrap();
     let document = scraper::Html::parse_document(&body);
-    parse_events(document)
+    parser.parse_all(document)
 }
 
 fn send_push_notification(events: &Vec<&Event>) -> Result<blocking::Response, reqwest::Error> {
@@ -339,102 +447,4 @@ fn send_push_notification(events: &Vec<&Event>) -> Result<blocking::Response, re
         .html(true)
         .build()
         .send()
-}
-
-fn parse_events(document: scraper::Html) -> Result<HashSet<Event>, ParseError> {
-    // Use same selectors for each event
-    let event_selector = scraper::Selector::parse(EVENT_SELECTOR).unwrap();
-    let main_info_selector = scraper::Selector::parse(MAIN_INFO_SELECTOR).unwrap();
-    let class_info_selector = scraper::Selector::parse(CLASS_INFO_SELECTOR).unwrap();
-
-    document
-        .select(&event_selector)
-        .map(|row| parse_event(row, &main_info_selector, &class_info_selector))
-        .collect()
-}
-
-fn parse_event(
-    row: scraper::ElementRef,
-    main_info_selector: &scraper::Selector,
-    class_info_selector: &scraper::Selector,
-) -> Result<Event, ParseError> {
-    let mut event: Event = Event::new();
-
-    parse_main_info(row, main_info_selector, &mut event)?;
-    parse_class_info(row, class_info_selector, &mut event);
-
-    Ok(event)
-}
-
-fn parse_main_info(
-    row: scraper::ElementRef,
-    selector: &scraper::Selector,
-    event: &mut Event,
-) -> Result<(), ParseError> {
-    for line in row.select(&selector) {
-        let text = parse_text(line);
-
-        let (title, date, time) = match text.len() {
-            3 => (text[0], text[1], text[2]),
-            5 => (text[0], text[3], text[4]),
-            _ => {
-                return Err(format!(
-                    "Expected event main info to have 3 or 5 lines, found {:?}",
-                    text
-                ))?
-            }
-        };
-
-        event.title = String::from(title);
-
-        let months = months();
-
-        let (day, month, year): (u32, u32, i32) = match (&date[4..6]).parse() {
-            Ok(day) => (
-                day,
-                months.get(&date[8..11]).unwrap().to_owned(),
-                (&date[12..]).parse().unwrap(),
-            ),
-            Err(_) => (
-                (&date[4..5]).parse().unwrap(),
-                months.get(&date[7..10]).unwrap().to_owned(),
-                (&date[11..]).parse().unwrap(),
-            ),
-        };
-
-        let hours: u32 = (&time[..2]).parse().unwrap();
-        let minutes: u32 = (&time[3..5]).parse().unwrap();
-
-        event.date_time = chrono::FixedOffset::east(2 * 3600)
-            .ymd(year, month, day)
-            .and_hms(hours, minutes, 0);
-    }
-
-    Ok(())
-}
-
-fn months() -> HashMap<String, u32> {
-    let names = vec![
-        "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
-    ];
-    let nums: Vec<u32> = (1..12).collect();
-    names
-        .into_iter()
-        .map(|m| String::from(m))
-        .zip(nums.into_iter())
-        .collect()
-}
-
-fn parse_class_info(row: scraper::ElementRef, selector: &scraper::Selector, event: &mut Event) {
-    for line in row.select(&selector) {
-        let text = parse_text(line);
-        event.class_info = text.iter().map(|t| t.to_string()).collect();
-    }
-}
-
-fn parse_text(line: scraper::ElementRef) -> Vec<&str> {
-    line.text()
-        .map(|t| t.trim())
-        .filter(|t| !t.is_empty())
-        .collect()
 }
