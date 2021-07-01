@@ -56,12 +56,13 @@ impl EventParser {
             event_selector: scraper::Selector::parse(EVENT_SELECTOR).unwrap(),
             main_info_selector: scraper::Selector::parse(MAIN_INFO_SELECTOR).unwrap(),
             class_info_selector: scraper::Selector::parse(CLASS_INFO_SELECTOR).unwrap(),
-            month_lookup: vec![
+            month_lookup: [
                 "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
             ]
-            .into_iter()
+            .iter()
+            .cloned()
             .map(|s| s.to_string())
-            .zip((1..12).into_iter())
+            .zip((1..13).into_iter())
             .collect(),
         }
     }
