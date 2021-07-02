@@ -99,8 +99,7 @@ fn main() {
 
         diff.sort();
 
-        // TODO: Handle response - see [Being Friendly to our API](https://pushover.net/api#friendly)
-        let response = send_push_notification(&diff).unwrap_or_else(crash(|error| {
+        send_push_notification(&diff).unwrap_or_else(crash(|error| {
             format!("Failed to send push notification: {}", error)
         }));
 

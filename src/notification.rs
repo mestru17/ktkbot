@@ -19,7 +19,11 @@ impl Notification {
     }
 
     pub fn send(self) -> Result<Response, reqwest::Error> {
-        Client::new().post(PUSHOVER_API_URL).form(&self).send()
+        Client::new()
+            .post(PUSHOVER_API_URL)
+            .form(&self)
+            .send()?
+            .error_for_status()
     }
 }
 

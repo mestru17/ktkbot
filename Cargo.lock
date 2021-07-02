@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "ktkbot"
-version = "0.9.4"
+version = "0.10.0"
 dependencies = [
  "chrono",
  "flexi_logger",
