@@ -14,9 +14,10 @@ Send push notifications when new tennis events are put up for Kløvermarkens Ten
 - [x] Sort events by date before outputting.
 - [x] Recognize error responses from Pushover.
 - [x] Write events to file in compact json instead of pretty json.
+- [ ] Improve event parsing implementation.
+  - Meta information such as number of free spots in an event should not be included in comparisons. Instead of doing deep event comparisons, it may be possible to extract an ID for each event from the HTML and compare by that. Another solution would be to properly parse all fields.
 - [ ] Command line arguments for configuration.
 - [ ] Asynchronous fetching and termination.
-- [ ] Improve event parsing implementation.
 - [ ] Improve error handling.
 - [ ] Documentation.
 
