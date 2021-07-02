@@ -124,18 +124,18 @@ impl EventParser {
             let (day, month, year): (u32, u32, i32) = match (&date[4..6]).parse() {
                 Ok(day) => (
                     day,
-                    self.month_lookup.get(&date[8..11]).unwrap().to_owned(),
-                    (&date[12..]).parse().unwrap(),
+                    self.month_lookup.get(&date[8..11]).unwrap().to_owned(), // FIXME: Handle or propagate error
+                    (&date[12..]).parse().unwrap(), // FIXME: Handle or propagate error
                 ),
                 Err(_) => (
-                    (&date[4..5]).parse().unwrap(),
-                    self.month_lookup.get(&date[7..10]).unwrap().to_owned(),
-                    (&date[11..]).parse().unwrap(),
+                    (&date[4..5]).parse().unwrap(), // FIXME: Handle or propagate error
+                    self.month_lookup.get(&date[7..10]).unwrap().to_owned(), // FIXME: Handle or propagate error
+                    (&date[11..]).parse().unwrap(), // FIXME: Handle or propagate error
                 ),
             };
 
-            let hours: u32 = (&time[..2]).parse().unwrap();
-            let minutes: u32 = (&time[3..5]).parse().unwrap();
+            let hours: u32 = (&time[..2]).parse().unwrap(); // FIXME: Handle or propagate error
+            let minutes: u32 = (&time[3..5]).parse().unwrap(); // FIXME: Handle or propagate error
 
             event.date_time = FixedOffset::east(2 * 3600)
                 .ymd(year, month, day)
