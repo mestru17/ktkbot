@@ -19,7 +19,7 @@ pub fn serialize_events(
     events: &HashSet<Event>,
     path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let json = serde_json::to_string_pretty(&events)?;
+    let json = serde_json::to_string(&events)?;
 
     let mut file = File::create(&path)?;
     file.write_all(json.as_bytes())?;
