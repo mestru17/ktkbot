@@ -7,6 +7,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Formatter},
     fs::File,
+    hash::{Hash, Hasher},
     io::Write,
     path::Path,
 };
@@ -33,8 +34,9 @@ pub fn deserialize_events(path: &Path) -> Result<HashSet<Event>, Box<dyn std::er
     Ok(events)
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Eq)]
 pub struct Event {
+    pub id: String,
     pub title: String,
     pub date_time: DateTime<FixedOffset>,
     pub class_info: Vec<String>,
@@ -43,6 +45,7 @@ pub struct Event {
 impl Event {
     pub fn new() -> Event {
         Event {
+            id: String::default(),
             title: String::default(),
             date_time: FixedOffset::east(2 * 3600)
                 .ymd(2021, 6, 30)
@@ -52,15 +55,35 @@ impl Event {
     }
 }
 
+impl PartialEq for Event {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Hash for Event {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
 impl PartialOrd for Event {
     fn partial_cmp(&self, other: &Event) -> Option<Ordering> {
-        self.date_time.partial_cmp(&other.date_time)
+        if self.id == other.id {
+            Some(Ordering::Equal)
+        } else {
+            self.date_time.partial_cmp(&other.date_time)
+        }
     }
 }
 
 impl Ord for Event {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.date_time.cmp(&other.date_time)
+        if self.id == other.id {
+            Ordering::Equal
+        } else {
+            self.date_time.cmp(&other.date_time)
+        }
     }
 }
 
@@ -97,6 +120,8 @@ impl EventParser {
 
     pub fn parse_one(&self, row: ElementRef) -> Result<Event, ParseError> {
         let mut event: Event = Event::new();
+
+        event.id = row.value().attr("id").unwrap().to_string(); // FIXME: Handle or propagate error
 
         self.parse_main_info(row, &mut event)?;
         self.parse_class_info(row, &mut event);
