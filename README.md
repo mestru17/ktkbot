@@ -14,10 +14,10 @@ Send push notifications when new tennis events are put up for Kløvermarkens Ten
 - [x] Sort events by date before outputting.
 - [x] Recognize error responses from Pushover.
 - [x] Write events to file in compact json instead of pretty json.
+- [ ] Improve error handling.
+- [ ] Documentation.
 - [ ] Improve event parsing implementation.
   - [x] Ignore changes to number of free spots in events.
 - [ ] Command line arguments for configuration.
 - [ ] Asynchronous fetching and termination.
-- [ ] Improve error handling.
-- [ ] Documentation.
 
