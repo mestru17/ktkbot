@@ -79,9 +79,16 @@ fn main() {
 
         info!("Fetching events...");
 
-        let events = fetcher
-            .fetch_all()
-            .unwrap_or_else(crash(|error| format!("Failed to fetch events: {}", error)));
+        let events = match fetcher.fetch_all() {
+            Ok(events) => events,
+            Err(event::EventError::Request(error)) => {
+                warn!("Failed to fetch events: {}", error);
+                continue;
+            }
+            Err(event::EventError::Parse(error)) => {
+                exit(format!("Failed to fetch events: {}", error).as_str())
+            }
+        };
 
         info!("Fetched events. Comparing to local list of events...");
 
@@ -113,6 +120,11 @@ fn main() {
 
         info!("Updated local list of events.");
     }
+}
+
+fn exit(message: &str) -> ! {
+    error!("{}", message);
+    panic!("{}", message)
 }
 
 fn crash<F, E, T>(f: F) -> impl Fn(E) -> T
