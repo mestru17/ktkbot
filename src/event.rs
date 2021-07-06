@@ -210,7 +210,7 @@ impl EventParser {
     fn parse_minutes(&self, s: &str) -> Result<u32, ParseError> {
         let minutes = s
             .parse()
-            .map_err(|_| ParseError::from(format!("Failed to parse hours from: '{}'", s)))?;
+            .map_err(|_| ParseError::from(format!("Failed to parse minutes from: '{}'", s)))?;
         Ok(minutes)
     }
 
