@@ -121,7 +121,11 @@ impl EventParser {
     pub fn parse_one(&self, row: ElementRef) -> Result<Event, ParseError> {
         let mut event: Event = Event::new();
 
-        event.id = row.value().attr("id").unwrap().to_string(); // FIXME: Handle or propagate error
+        event.id = row
+            .value()
+            .attr("id")
+            .ok_or(ParseError::from("No 'id' attribute in event HTML."))?
+            .to_string();
 
         self.parse_main_info(row, &mut event)?;
         self.parse_class_info(row, &mut event);
@@ -146,21 +150,21 @@ impl EventParser {
 
             event.title = String::from(title);
 
-            let (day, month, year): (u32, u32, i32) = match (&date[4..6]).parse() {
+            let (day, month, year): (u32, u32, i32) = match self.parse_day(&date[4..6]) {
                 Ok(day) => (
                     day,
-                    self.month_lookup.get(&date[8..11]).unwrap().to_owned(), // FIXME: Handle or propagate error
-                    (&date[12..]).parse().unwrap(), // FIXME: Handle or propagate error
+                    self.parse_month(&date[8..11])?,
+                    self.parse_year(&date[12..])?,
                 ),
                 Err(_) => (
-                    (&date[4..5]).parse().unwrap(), // FIXME: Handle or propagate error
-                    self.month_lookup.get(&date[7..10]).unwrap().to_owned(), // FIXME: Handle or propagate error
-                    (&date[11..]).parse().unwrap(), // FIXME: Handle or propagate error
+                    self.parse_day(&date[4..5])?,
+                    self.parse_month(&date[7..10])?,
+                    self.parse_year(&date[11..])?,
                 ),
             };
 
-            let hours: u32 = (&time[..2]).parse().unwrap(); // FIXME: Handle or propagate error
-            let minutes: u32 = (&time[3..5]).parse().unwrap(); // FIXME: Handle or propagate error
+            let hours = self.parse_hours(&time[..2])?;
+            let minutes = self.parse_minutes(&time[3..5])?;
 
             event.date_time = FixedOffset::east(2 * 3600)
                 .ymd(year, month, day)
@@ -168,6 +172,46 @@ impl EventParser {
         }
 
         Ok(())
+    }
+
+    fn parse_day(&self, s: &str) -> Result<u32, ParseError> {
+        let day = s
+            .parse()
+            .map_err(|_| ParseError::from(format!("Failed to parse day from: '{}'", s)))?;
+        Ok(day)
+    }
+
+    fn parse_month(&self, s: &str) -> Result<u32, ParseError> {
+        let month = self
+            .month_lookup
+            .get(s)
+            .ok_or(ParseError::from(format!(
+                "No month matching pattern: '{}'",
+                s
+            )))?
+            .to_owned();
+        Ok(month)
+    }
+
+    fn parse_year(&self, s: &str) -> Result<i32, ParseError> {
+        let year = s
+            .parse()
+            .map_err(|_| ParseError::from(format!("Failed to parse year from: '{}'", s)))?;
+        Ok(year)
+    }
+
+    fn parse_hours(&self, s: &str) -> Result<u32, ParseError> {
+        let hours = s
+            .parse()
+            .map_err(|_| ParseError::from(format!("Failed to parse hours from: '{}'", s)))?;
+        Ok(hours)
+    }
+
+    fn parse_minutes(&self, s: &str) -> Result<u32, ParseError> {
+        let minutes = s
+            .parse()
+            .map_err(|_| ParseError::from(format!("Failed to parse hours from: '{}'", s)))?;
+        Ok(minutes)
     }
 
     fn parse_class_info(&self, row: ElementRef, event: &mut Event) {
@@ -182,6 +226,33 @@ impl EventParser {
             .map(|t| t.trim())
             .filter(|t| !t.is_empty())
             .collect()
+    }
+}
+
+#[derive(Debug)]
+pub enum EventError {
+    Parse(ParseError),
+    Request(reqwest::Error),
+}
+
+impl fmt::Display for EventError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            EventError::Parse(error) => write!(f, "Parse error: {}", error),
+            EventError::Request(error) => write!(f, "Request error: {}", error),
+        }
+    }
+}
+
+impl From<reqwest::Error> for EventError {
+    fn from(error: reqwest::Error) -> Self {
+        EventError::Request(error)
+    }
+}
+
+impl From<ParseError> for EventError {
+    fn from(error: ParseError) -> Self {
+        EventError::Parse(error)
     }
 }
 
@@ -202,6 +273,12 @@ impl From<String> for ParseError {
     }
 }
 
+impl From<&str> for ParseError {
+    fn from(message: &str) -> Self {
+        ParseError::from(message.to_string())
+    }
+}
+
 pub struct EventFetcher {
     client: Client,
     parser: EventParser,
@@ -217,7 +294,7 @@ impl EventFetcher {
         })
     }
 
-    pub fn fetch_all(&self) -> Result<HashSet<Event>, ParseError> {
+    pub fn fetch_all(&self) -> Result<HashSet<Event>, EventError> {
         let mut events: HashSet<Event> = HashSet::new();
 
         let mut i = 0;
@@ -237,11 +314,12 @@ impl EventFetcher {
         Ok(events)
     }
 
-    pub fn fetch(&self, url: &str) -> Result<HashSet<Event>, ParseError> {
-        let response = self.client.get(url).send().unwrap(); // FIXME: Handle or propagate error
-        let body = response.text().unwrap(); // FIXME: Handle or propagate error
+    pub fn fetch(&self, url: &str) -> Result<HashSet<Event>, EventError> {
+        let response = self.client.get(url).send()?;
+        let body = response.text()?;
         let document = Html::parse_document(&body);
-        self.parser.parse_all(document)
+        let events = self.parser.parse_all(document)?;
+        Ok(events)
     }
 
     fn events_url(index: u32) -> String {
