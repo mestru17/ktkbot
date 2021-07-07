@@ -5,7 +5,7 @@ mod notification;
 use log_extern::{error, info, warn};
 use notification::Notification;
 use reqwest::blocking::Response;
-use std::{fmt::Display, path::Path, thread, time::Duration};
+use std::{path::Path, thread, time::Duration};
 
 use event::{
     fetch::{EventFetcher, FetchError},
@@ -30,9 +30,8 @@ fn main() {
 
     info!("Creating EventFetcher...");
 
-    let fetcher = EventFetcher::new().unwrap_or_else(crash(|error| {
-        format!("Failed to create EventFetcher: {}", error)
-    }));
+    let fetcher = EventFetcher::new()
+        .unwrap_or_else(|error| exit(format!("Failed to create EventFetcher: {}", error).as_str()));
 
     info!(
         "Created EventFetcher. Loading local list of events from {}...",
@@ -50,7 +49,7 @@ fn main() {
 
         let events = fetcher
             .fetch_all()
-            .unwrap_or_else(crash(|error| format!("Failed to fetch events: {}", error)));
+            .unwrap_or_else(|error| exit(format!("Failed to fetch events: {}", error).as_str()));
 
         info!("Fetched events. Writing them to {}...", EVENTS_FILE);
 
@@ -108,9 +107,9 @@ fn main() {
 
         diff.sort();
 
-        send_push_notification(&diff).unwrap_or_else(crash(|error| {
-            format!("Failed to send push notification: {}", error)
-        }));
+        send_push_notification(&diff).unwrap_or_else(|error| {
+            exit(format!("Failed to send push notification: {}", error).as_str())
+        });
 
         info!("Sent push notification. Updating local list of events...");
 
@@ -127,18 +126,6 @@ fn main() {
 fn exit(message: &str) -> ! {
     error!("{}", message);
     panic!("{}", message)
-}
-
-fn crash<F, E, T>(f: F) -> impl Fn(E) -> T
-where
-    F: Fn(E) -> String,
-    E: Display,
-{
-    move |error| {
-        let message = f(error);
-        error!("{}", message);
-        panic!("{}", message);
-    }
 }
 
 fn send_push_notification(events: &Vec<&Event>) -> Result<Response, reqwest::Error> {
