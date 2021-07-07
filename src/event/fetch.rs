@@ -26,7 +26,7 @@ impl EventFetcher {
         })
     }
 
-    pub fn fetch_all(&self) -> Result<HashSet<Event>, EventError> {
+    pub fn fetch_all(&self) -> Result<HashSet<Event>, FetchError> {
         let mut events: HashSet<Event> = HashSet::new();
 
         let mut i = 0;
@@ -46,7 +46,7 @@ impl EventFetcher {
         Ok(events)
     }
 
-    pub fn fetch(&self, url: &str) -> Result<HashSet<Event>, EventError> {
+    pub fn fetch(&self, url: &str) -> Result<HashSet<Event>, FetchError> {
         let response = self.client.get(url).send()?;
         let body = response.text()?;
         let document = Html::parse_document(&body);
@@ -64,28 +64,28 @@ impl EventFetcher {
 }
 
 #[derive(Debug)]
-pub enum EventError {
+pub enum FetchError {
     Parse(ParseError),
     Request(reqwest::Error),
 }
 
-impl fmt::Display for EventError {
+impl fmt::Display for FetchError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            EventError::Parse(error) => write!(f, "Parse error: {}", error),
-            EventError::Request(error) => write!(f, "Request error: {}", error),
+            FetchError::Parse(error) => write!(f, "Parse error: {}", error),
+            FetchError::Request(error) => write!(f, "Request error: {}", error),
         }
     }
 }
 
-impl From<reqwest::Error> for EventError {
+impl From<reqwest::Error> for FetchError {
     fn from(error: reqwest::Error) -> Self {
-        EventError::Request(error)
+        FetchError::Request(error)
     }
 }
 
-impl From<ParseError> for EventError {
+impl From<ParseError> for FetchError {
     fn from(error: ParseError) -> Self {
-        EventError::Parse(error)
+        FetchError::Parse(error)
     }
 }

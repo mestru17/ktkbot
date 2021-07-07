@@ -8,7 +8,7 @@ use reqwest::blocking::Response;
 use std::{fmt::Display, path::Path, thread, time::Duration};
 
 use event::{
-    fetch::{EventError, EventFetcher},
+    fetch::{EventFetcher, FetchError},
     Event,
 };
 
@@ -83,11 +83,11 @@ fn main() {
 
         let events = match fetcher.fetch_all() {
             Ok(events) => events,
-            Err(EventError::Request(error)) => {
+            Err(FetchError::Request(error)) => {
                 warn!("Failed to fetch events: {}", error);
                 continue;
             }
-            Err(EventError::Parse(error)) => {
+            Err(FetchError::Parse(error)) => {
                 exit(format!("Failed to fetch events: {}", error).as_str())
             }
         };
