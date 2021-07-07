@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fix bug causing ktkbot to misclassify changed events as new events - i.e. when the
-  number of available spots on an would decrease because someone registered for it,
-  ktkbot would see that as a new event and send a push notification.
+  number of available spots on an event would decrease because someone registered for
+  it, ktkbot would see that as a new event and send a push notification.
 
 ## [0.10.1] - 2021-07-02
 ### Added
