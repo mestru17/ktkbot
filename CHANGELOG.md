@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.10.5] - 2021-07-08
 ### Added
 - Thorough error handling when parsing events.
 - This CHANGELOG.md file to hopefully better keep track of changes.
@@ -47,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [friendly](https://pushover.net/api#friendly) to their API.
 - `FIXME` comments where there are still unhandled errors.
 
-[Unreleased]: https://github.com/mestru17/ktkbot/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/mestru17/ktkbot/compare/v0.10.5...HEAD
+[0.10.5]: https://github.com/mestru17/ktkbot/compare/v0.10.1...v0.10.5
 [0.10.1]: https://github.com/mestru17/ktkbot/releases/tag/v0.10.1
 
