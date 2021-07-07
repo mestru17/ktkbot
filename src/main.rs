@@ -2,13 +2,15 @@ mod event;
 mod log;
 mod notification;
 
-use crate::{
-    event::{Event, EventFetcher},
-    notification::Notification,
-};
 use log_extern::{error, info, warn};
+use notification::Notification;
 use reqwest::blocking::Response;
 use std::{fmt::Display, path::Path, thread, time::Duration};
+
+use event::{
+    fetch::{EventError, EventFetcher},
+    Event,
+};
 
 const LOG_SPEC: &str = "info";
 const LOG_DIRECTORY: &str = "logs";
@@ -81,11 +83,11 @@ fn main() {
 
         let events = match fetcher.fetch_all() {
             Ok(events) => events,
-            Err(event::EventError::Request(error)) => {
+            Err(EventError::Request(error)) => {
                 warn!("Failed to fetch events: {}", error);
                 continue;
             }
-            Err(event::EventError::Parse(error)) => {
+            Err(EventError::Parse(error)) => {
                 exit(format!("Failed to fetch events: {}", error).as_str())
             }
         };
