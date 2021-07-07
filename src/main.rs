@@ -114,9 +114,8 @@ fn main() {
         info!("Sent push notification. Updating local list of events...");
 
         stored_events = events;
-        if let Err(why) = event::serialize_events(&stored_events, &events_file_path) {
-            error!("Failed to serialize events: {}", why);
-            panic!();
+        if let Err(error) = event::serialize_events(&stored_events, &events_file_path) {
+            exit(format!("Failed to serialize events: {}", error).as_str());
         }
 
         info!("Updated local list of events.");
