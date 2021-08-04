@@ -75,19 +75,27 @@ impl EventParser {
 
             event.title = String::from(title);
 
-            let (day, month, year): (u32, u32, i32) = match self.parse_day(&date[4..6]) {
-                Ok(day) => (
-                    day,
-                    self.parse_month(&date[8..11])?,
-                    self.parse_year(&date[12..])?,
-                ),
-                Err(_) => (
-                    self.parse_day(&date[4..5])?,
-                    self.parse_month(&date[7..10])?,
-                    self.parse_year(&date[11..])?,
-                ),
-            };
+            // Parse day, month, and year
+            let mut date_iter = date.split_whitespace();
 
+            date_iter.next(); // skip name of day
+
+            let day = date_iter.next().ok_or(ParseError::from(format!(
+                "Failed to parse day: No more values in date iterator"
+            )))?;
+            let day: u32 = self.parse_day(&day[..(day.len() - 1)])?;
+
+            let month = date_iter.next().ok_or(ParseError::from(format!(
+                "Failed to parse month: No more values in date iterator"
+            )))?;
+            let month: u32 = self.parse_month(month)?;
+
+            let year = date_iter.next().ok_or(ParseError::from(format!(
+                "Failed to parse year: No more values in date iterator"
+            )))?;
+            let year: i32 = self.parse_year(year)?;
+
+            // Parse time
             let hours = self.parse_hours(&time[..2])?;
             let minutes = self.parse_minutes(&time[3..5])?;
 
