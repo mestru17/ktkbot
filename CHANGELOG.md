@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Change logging to create a new log file every day.
 - Change logging to keep the seven newest log files and automatically delete older ones.
+- Change date parsing to split by whitespace instead of using exact string indeces.
+
+### Fixed
+- Fix bug causing failure to parse some dates due to inconsistent amounts of whitespace.
 
 ## [0.10.5] - 2021-07-08
 ### Added
