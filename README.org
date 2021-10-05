@@ -7,6 +7,8 @@ ktkbot is bot that sends push notifications when new tennis events are put up fo
 KTK has no automatic notification system for when new events (i.e. training lessons) are made available on the booking website. Joining events requires doing so before the number of available spots fill up. By getting these notifications, you gain the advantage of knowing immediately when events become available.
 
 * Installation
+Either download the latest binary release or clone the repository.
+
 ** Download Binary (easy)
 Download the [[https://github.com/mestru17/ktkbot/releases/latest][latest release]] and place it wherever you want.
 
