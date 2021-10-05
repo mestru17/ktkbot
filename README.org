@@ -1,0 +1,34 @@
+#+TITLE: ktkbot
+#+DESCRIPTION: Readme for ktkbot.
+#+AUTHOR: Mathias Estrup
+
+ktkbot is bot that sends push notifications when new tennis events are put up for Kløvermarkens Tennis Klub (KTK).
+
+KTK has no automatic notification system for when new events (i.e. training lessons) are made available on the booking website. Joining events requires doing so before the number of available spots fill up. By getting these notifications, you gain the advantage of knowing immediately when events become available.
+
+* Installation
+** Download Binary (easy)
+Download the [[https://github.com/mestru17/ktkbot/releases/latest][latest release]] and place it wherever you want.
+
+** Clone the repository (requires [[https://doc.rust-lang.org/cargo/getting-started/installation.html][Cargo]])
+Clone the repository and build from source yourself to get the newest version including unreleased changes:
+#+begin_src bash
+$ git clone https://github.com/mestru17/ktkbot.git
+$ cd ktkbot
+$ cargo build --release
+#+end_src
+
+This compiles ktkbot and puts the executable in the =target/release= directory.
+
+* Usage
+Either add the =ktkbot= executable to your =PATH= or simply run it from whichever directory it resides in.
+
+** Run from anywhere (i.e. ktkbot is in =PATH=)
+#+begin_src bash
+$ ktkbot
+#+end_src
+
+** Run from directory
+#+begin_src bash
+$ ./path/to/ktkbot
+#+end_src
