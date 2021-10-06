@@ -1,3 +1,4 @@
+mod args;
 mod event;
 mod log;
 mod notification;
@@ -5,28 +6,28 @@ mod notification;
 use log_extern::{error, info, warn};
 use notification::Notification;
 use reqwest::blocking::Response;
-use std::{path::Path, thread, time::Duration};
+use std::thread;
 
 use event::{
     fetch::{EventFetcher, FetchError},
     Event,
 };
 
-const LOG_SPEC: &str = "info";
-const LOG_DIRECTORY: &str = "logs";
+// const LOG_SPEC: &str = "info";
+// const LOG_DIRECTORY: &str = "logs";
 
-const PUSHOVER_API_KEY: &str = "***REMOVED***"; // FIXME: Don't store api key in program
-const PUSHOVER_GROUP_KEY: &str = "***REMOVED***"; // FIXME: Don't store user key in program
+// const PUSHOVER_API_KEY: &str = "***REMOVED***"; // FIXME: Don't store api key in program
+// const PUSHOVER_GROUP_KEY: &str = "***REMOVED***"; // FIXME: Don't store user key in program
 
-const EVENTS_FILE: &str = "events.json";
-const FETCH_INTERVAL_SECONDS: u64 = 120;
+// const EVENTS_FILE: &str = "events.json";
+// const FETCH_INTERVAL_SECONDS: u64 = 120;
 
 fn main() {
-    let _logger_handle = log::init_logger(LOG_SPEC, LOG_DIRECTORY)
-        .unwrap_or_else(|error| panic!("Failed to initialize logger: {}", error));
+    let config = args::parse_args();
 
-    let events_file_path = Path::new(EVENTS_FILE);
-    let fetch_interval = Duration::from_secs(FETCH_INTERVAL_SECONDS);
+    let _logger_handle =
+        log::init_logger(&config.log_level, config.log_directory().to_str().unwrap())
+            .unwrap_or_else(|error| panic!("Failed to initialize logger: {}", error));
 
     info!("Creating EventFetcher...");
 
@@ -34,37 +35,42 @@ fn main() {
         .unwrap_or_else(|error| exit(format!("Failed to create EventFetcher: {}", error).as_str()));
 
     info!(
-        "Created EventFetcher. Loading local list of events from {}...",
-        EVENTS_FILE
+        "Created EventFetcher. Loading local list of events from {:?}...",
+        config.events_file()
     );
 
     // Try to load known events from local file. If it fails, then fetch the events and write them
     // to the file. If writing fails, then continue with in-memory list `stored_events`.
-    let mut stored_events = event::deserialize_events(events_file_path).unwrap_or_else(|error| {
-        warn!("Failed to load local list of events: {}", error);
-        warn!(
-            "Fetching events and creating new local list at {} instead...",
-            EVENTS_FILE
-        );
-
-        let events = fetcher
-            .fetch_all()
-            .unwrap_or_else(|error| exit(format!("Failed to fetch events: {}", error).as_str()));
-
-        info!("Fetched events. Writing them to {}...", EVENTS_FILE);
-
-        if let Err(error) = event::serialize_events(&events, &events_file_path) {
+    let mut stored_events =
+        event::deserialize_events(config.events_file()).unwrap_or_else(|error| {
+            warn!("Failed to load local list of events: {}", error);
             warn!(
-                "Failed to save fetched events to {}: {}",
-                EVENTS_FILE, error
+                "Fetching events and creating new local list at {:?} instead...",
+                config.events_file()
             );
-            warn!("Continuing without saving events to disk, only storing them in memory.");
-        } else {
-            info!("Wrote events to {}.", EVENTS_FILE);
-        }
 
-        events
-    });
+            let events = fetcher.fetch_all().unwrap_or_else(|error| {
+                exit(format!("Failed to fetch events: {}", error).as_str())
+            });
+
+            info!(
+                "Fetched events. Writing them to {:?}...",
+                config.events_file()
+            );
+
+            if let Err(error) = event::serialize_events(&events, config.events_file()) {
+                warn!(
+                    "Failed to save fetched events to {:?}: {}",
+                    config.events_file(),
+                    error
+                );
+                warn!("Continuing without saving events to disk, only storing them in memory.");
+            } else {
+                info!("Wrote events to {:?}.", config.events_file());
+            }
+
+            events
+        });
 
     // Continuously fetch events and compare to local list of events. If there are any new ones,
     // then send a push notification and update local list.
@@ -72,7 +78,7 @@ fn main() {
     loop {
         if running {
             info!("Fetching again in 2 minutes.\n");
-            thread::sleep(fetch_interval);
+            thread::sleep(config.fetch_interval);
         } else {
             running = true;
             info!("Now running.");
@@ -107,14 +113,15 @@ fn main() {
 
         diff.sort();
 
-        send_push_notification(&diff).unwrap_or_else(|error| {
-            exit(format!("Failed to send push notification: {}", error).as_str())
-        });
+        send_push_notification(&diff, &config.pushover_api_key, &config.pushover_group_key)
+            .unwrap_or_else(|error| {
+                exit(format!("Failed to send push notification: {}", error).as_str())
+            });
 
         info!("Sent push notification. Updating local list of events...");
 
         stored_events = events;
-        if let Err(error) = event::serialize_events(&stored_events, &events_file_path) {
+        if let Err(error) = event::serialize_events(&stored_events, config.events_file()) {
             exit(format!("Failed to serialize events: {}", error).as_str());
         }
 
@@ -127,7 +134,11 @@ fn exit(message: &str) -> ! {
     panic!("{}", message)
 }
 
-fn send_push_notification(events: &Vec<&Event>) -> Result<Response, reqwest::Error> {
+fn send_push_notification(
+    events: &Vec<&Event>,
+    api_key: &str,
+    group_key: &str,
+) -> Result<Response, reqwest::Error> {
     let mut message = String::from("<u>Der er blevet lagt nye tider op</u>:");
     for event in events {
         message.push_str(
@@ -139,7 +150,7 @@ fn send_push_notification(events: &Vec<&Event>) -> Result<Response, reqwest::Err
             .as_str(),
         );
     }
-    Notification::builder(PUSHOVER_API_KEY, PUSHOVER_GROUP_KEY, &message[..])
+    Notification::builder(api_key, group_key, &message[..])
         .title("Nye tider lagt op!")
         .html(true)
         .build()
