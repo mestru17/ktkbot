@@ -5,10 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Command line arguments for all configuration.
+
 ### Changed
 - Change logging to create a new log file every day.
 - Change logging to keep the seven newest log files and automatically delete older ones.
 - Change date parsing to split by whitespace instead of using exact string indeces.
+- Take all configuration as command line arguments instead of using hardcoded values.
 
 ### Fixed
 - Fix bug causing failure to parse some dates due to inconsistent amounts of whitespace.
