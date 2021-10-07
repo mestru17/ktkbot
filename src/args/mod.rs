@@ -21,26 +21,40 @@ pub struct Config {
 
 impl Config {
     pub fn events_file(&self) -> &Path {
-        self.events_file.as_path()
+        &self.events_file.as_path()
     }
 }
 
 #[derive(Debug)]
 pub struct LogConfig {
-    pub level: String,
+    level: String,
     directory: PathBuf,
 }
 
 impl LogConfig {
+    pub fn level(&self) -> &str {
+        self.level.as_str()
+    }
+
     pub fn directory(&self) -> &Path {
-        self.directory.as_path()
+        &self.directory.as_path()
     }
 }
 
 #[derive(Debug)]
 pub struct PushoverConfig {
-    pub api_key: String,
-    pub group_key: String,
+    api_key: String,
+    group_key: String,
+}
+
+impl PushoverConfig {
+    pub fn api_key(&self) -> &str {
+        self.api_key.as_str()
+    }
+
+    pub fn group_key(&self) -> &str {
+        self.group_key.as_str()
+    }
 }
 
 pub fn parse_config() -> Config {
