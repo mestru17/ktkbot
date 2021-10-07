@@ -3,6 +3,7 @@ mod event;
 mod log;
 mod notification;
 
+use args::PushoverConfig;
 use log_extern::{error, info, warn};
 use notification::Notification;
 use reqwest::blocking::Response;
@@ -13,21 +14,11 @@ use event::{
     Event,
 };
 
-// const LOG_SPEC: &str = "info";
-// const LOG_DIRECTORY: &str = "logs";
-
-// const PUSHOVER_API_KEY: &str = "***REMOVED***"; // FIXME: Don't store api key in program
-// const PUSHOVER_GROUP_KEY: &str = "***REMOVED***"; // FIXME: Don't store user key in program
-
-// const EVENTS_FILE: &str = "events.json";
-// const FETCH_INTERVAL_SECONDS: u64 = 120;
-
 fn main() {
-    let config = args::parse_args();
+    let config = args::parse_config();
 
-    let _logger_handle =
-        log::init_logger(&config.log_level, config.log_directory().to_str().unwrap())
-            .unwrap_or_else(|error| panic!("Failed to initialize logger: {}", error));
+    let _logger_handle = log::init_logger(&config.log)
+        .unwrap_or_else(|error| panic!("Failed to initialize logger: {}", error));
 
     info!("Creating EventFetcher...");
 
@@ -113,10 +104,9 @@ fn main() {
 
         diff.sort();
 
-        send_push_notification(&diff, &config.pushover_api_key, &config.pushover_group_key)
-            .unwrap_or_else(|error| {
-                exit(format!("Failed to send push notification: {}", error).as_str())
-            });
+        send_push_notification(&diff, &config.pushover).unwrap_or_else(|error| {
+            exit(format!("Failed to send push notification: {}", error).as_str())
+        });
 
         info!("Sent push notification. Updating local list of events...");
 
@@ -136,8 +126,7 @@ fn exit(message: &str) -> ! {
 
 fn send_push_notification(
     events: &Vec<&Event>,
-    api_key: &str,
-    group_key: &str,
+    config: &PushoverConfig,
 ) -> Result<Response, reqwest::Error> {
     let mut message = String::from("<u>Der er blevet lagt nye tider op</u>:");
     for event in events {
@@ -150,7 +139,7 @@ fn send_push_notification(
             .as_str(),
         );
     }
-    Notification::builder(api_key, group_key, &message[..])
+    Notification::builder(&config.api_key, &config.group_key, &message[..])
         .title("Nye tider lagt op!")
         .html(true)
         .build()
