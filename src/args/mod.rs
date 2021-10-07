@@ -44,31 +44,38 @@ pub struct PushoverConfig {
 }
 
 pub fn parse_config() -> Config {
+    const LOG_LEVEL_NAME: &str = "log_level";
+    const LOG_DIRECTORY_NAME: &str = "log_directory";
+    const PUSHOVER_API_KEY_NAME: &str = "pushover_api_key";
+    const PUSHOVER_GROUP_KEY_NAME: &str = "pushover_group_key";
+    const EVENTS_FILE_NAME: &str = "events_file";
+    const FETCH_INTERVAL_NAME: &str = "fetch_interval_seconds_name";
+
     let matches = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!(",\n"))
         .about("Sends KTK event push notifications.")
         .args(&[
-            argument::log_level(),
-            argument::log_directory(),
-            argument::pushover_api_key(),
-            argument::pushover_group_key(),
-            argument::events_file(),
-            argument::fetch_interval(),
+            argument::log_level(LOG_LEVEL_NAME),
+            argument::log_directory(LOG_DIRECTORY_NAME),
+            argument::pushover_api_key(PUSHOVER_API_KEY_NAME),
+            argument::pushover_group_key(PUSHOVER_GROUP_KEY_NAME),
+            argument::events_file(EVENTS_FILE_NAME),
+            argument::fetch_interval(FETCH_INTERVAL_NAME),
         ])
         .get_matches();
 
     Config {
         log: LogConfig {
-            level: matches.parse(argument::LOG_LEVEL_NAME),
-            directory: matches.parse(argument::LOG_DIRECTORY_NAME),
+            level: matches.parse(LOG_LEVEL_NAME),
+            directory: matches.parse(LOG_DIRECTORY_NAME),
         },
         pushover: PushoverConfig {
-            api_key: matches.parse(argument::PUSHOVER_API_KEY_NAME),
-            group_key: matches.parse(argument::PUSHOVER_GROUP_KEY_NAME),
+            api_key: matches.parse(PUSHOVER_API_KEY_NAME),
+            group_key: matches.parse(PUSHOVER_GROUP_KEY_NAME),
         },
-        events_file: matches.parse(argument::EVENTS_FILE_NAME),
-        fetch_interval: matches.parse(argument::FETCH_INTERVAL_NAME),
+        events_file: matches.parse(EVENTS_FILE_NAME),
+        fetch_interval: matches.parse(FETCH_INTERVAL_NAME),
     }
 }
 

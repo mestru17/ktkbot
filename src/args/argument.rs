@@ -2,15 +2,8 @@ use clap::Arg;
 
 use super::validate;
 
-pub const LOG_LEVEL_NAME: &str = "log_level";
-pub const LOG_DIRECTORY_NAME: &str = "log_directory";
-pub const PUSHOVER_API_KEY_NAME: &str = "pushover_api_key";
-pub const PUSHOVER_GROUP_KEY_NAME: &str = "pushover_group_key";
-pub const EVENTS_FILE_NAME: &str = "events_file";
-pub const FETCH_INTERVAL_NAME: &str = "fetch_interval_seconds_name";
-
-pub fn log_level<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(LOG_LEVEL_NAME)
+pub fn log_level(name: &str) -> Arg {
+    Arg::with_name(name)
         .short("l")
         .long("log-level")
         .value_name("LOG LEVEL")
@@ -20,8 +13,8 @@ pub fn log_level<'a>() -> Arg<'a, 'a> {
         .default_value("info")
 }
 
-pub fn log_directory<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(LOG_DIRECTORY_NAME)
+pub fn log_directory(name: &str) -> Arg {
+    Arg::with_name(name)
         .short("d")
         .long("log-directory")
         .value_name("DIRECTORY")
@@ -31,8 +24,8 @@ pub fn log_directory<'a>() -> Arg<'a, 'a> {
         .validator(validate::length(1, 64))
 }
 
-pub fn pushover_api_key<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(PUSHOVER_API_KEY_NAME)
+pub fn pushover_api_key(name: &str) -> Arg {
+    Arg::with_name(name)
         .value_name("PUSHOVER API KEY")
         .help("The API key to use for sending Pushover notifications.")
         .required(true)
@@ -40,8 +33,8 @@ pub fn pushover_api_key<'a>() -> Arg<'a, 'a> {
         .validator(validate::pushover_key)
 }
 
-pub fn pushover_group_key<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(PUSHOVER_GROUP_KEY_NAME)
+pub fn pushover_group_key(name: &str) -> Arg {
+    Arg::with_name(name)
         .value_name("PUSHOVER GROUP KEY")
         .help("The group key to use for sending Pushover notifications.")
         .required(true)
@@ -49,8 +42,8 @@ pub fn pushover_group_key<'a>() -> Arg<'a, 'a> {
         .validator(validate::pushover_key)
 }
 
-pub fn events_file<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(EVENTS_FILE_NAME)
+pub fn events_file(name: &str) -> Arg {
+    Arg::with_name(name)
         .short("e")
         .long("events-file")
         .value_name("FILE")
@@ -60,8 +53,8 @@ pub fn events_file<'a>() -> Arg<'a, 'a> {
         .validator(validate::length(1, 64))
 }
 
-pub fn fetch_interval<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(FETCH_INTERVAL_NAME)
+pub fn fetch_interval(name: &str) -> Arg {
+    Arg::with_name(name)
         .short("f")
         .long("fetch-interval")
         .value_name("SECONDS")
