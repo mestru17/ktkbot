@@ -139,9 +139,8 @@ fn send_push_notification(
             .as_str(),
         );
     }
-    Notification::builder(config.api_key(), config.group_key(), &message[..])
+    Notification::new(config.api_key(), config.group_key(), &message[..])
         .title("Nye tider lagt op!")
         .html(true)
-        .build()
         .send()
 }
