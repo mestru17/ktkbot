@@ -23,14 +23,40 @@ $ cargo build --release
 This compiles ktkbot and puts the executable in the =target/release= directory.
 
 * Usage
-Either add the =ktkbot= executable to your =PATH= or simply run it from whichever directory it resides in.
+Either add the =ktkbot= executable to your =PATH= or simply run it from whichever directory it resides in. Note that you need to supply your Pushover API and group keys as arguments at the moment.
 
 ** Run from anywhere (i.e. ktkbot is in =PATH=)
 #+begin_src bash
-$ ktkbot
+$ ktkbot [OPTIONS] <PUSHOVER API KEY> <PUSHOVER GROUP KEY>
 #+end_src
 
 ** Run from directory
 #+begin_src bash
-$ ./path/to/ktkbot
+$ ./path/to/ktkbot [OPTIONS] <PUSHOVER API KEY> <PUSHOVER GROUP KEY>
+#+end_src
+
+** Options
+By passing the ~--help~ flag, you can also get a more in-depth usage description that includes configuration options:
+#+begin_src bash
+$ ktkbot --help
+ktkbot 0.12.0
+mestru17
+Sends KTK event push notifications.
+
+USAGE:
+    ktkbot [OPTIONS] <PUSHOVER API KEY> <PUSHOVER GROUP KEY>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -e, --events-file <FILE>           Sets the file to save events to. [default: events.json]
+    -f, --fetch-interval <SECONDS>     Sets the delay in between fetching events. [default: 120]
+    -d, --log-directory <DIRECTORY>    Sets the directory to put log files in. [default: logs]
+    -l, --log-level <LOG LEVEL>        Sets the level of logging. [default: info]  [possible values: info, warn, error]
+
+ARGS:
+    <PUSHOVER API KEY>      The API key to use for sending Pushover notifications.
+    <PUSHOVER GROUP KEY>    The group key to use for sending Pushover notifications.
 #+end_src
