@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.12.0] - 2021-10-11
 ### Added
 - Command line arguments for all configuration.
 
@@ -60,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [friendly](https://pushover.net/api#friendly) to their API.
 - `FIXME` comments where there are still unhandled errors.
 
-[Unreleased]: https://github.com/mestru17/ktkbot/compare/v0.10.5...HEAD
+[Unreleased]: https://github.com/mestru17/ktkbot/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/mestru17/ktkbot/compare/v0.10.5...v0.12.0
 [0.10.5]: https://github.com/mestru17/ktkbot/compare/v0.10.1...v0.10.5
 [0.10.1]: https://github.com/mestru17/ktkbot/releases/tag/v0.10.1
 
