@@ -8,9 +8,6 @@ use std::{
 
 use clap::{crate_authors, crate_name, crate_version, App, ArgMatches};
 
-// const PUSHOVER_API_KEY: &str = "***REMOVED***"; // FIXME: Don't store api key in program
-// const PUSHOVER_GROUP_KEY: &str = "***REMOVED***"; // FIXME: Don't store user key in program
-
 #[derive(Debug)]
 pub struct Config {
     pub log: LogConfig,
