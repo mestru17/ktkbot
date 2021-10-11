@@ -1,8 +1,12 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 
-pub fn length(min: usize, max: usize) -> impl Fn(String) -> Result<(), String> {
-    move |s| {
+pub fn length(min: usize, max: usize) -> Option<impl Fn(String) -> Result<(), String>> {
+    if max < min {
+        return None;
+    }
+
+    Some(move |s: String| {
         if s.len() < min || s.len() > max {
             return Err(format!(
                 "Invalid length - must be between {} and {} (inclusive) characters long",
@@ -10,7 +14,7 @@ pub fn length(min: usize, max: usize) -> impl Fn(String) -> Result<(), String> {
             ));
         }
         Ok(())
-    }
+    })
 }
 
 pub fn pushover_key(s: String) -> Result<(), String> {
@@ -42,15 +46,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn length_zero() {
-        let f = length(0, 0);
-        assert!(f(String::from("")).is_ok());
-        assert!(f(String::from("too long")).is_err());
+    fn length_range() {
+        assert!(length(0, 2).is_some());
+        assert!(length(1, 2).is_some());
+        assert!(length(2, 2).is_some());
+        assert!(length(3, 2).is_none());
+        assert!(length(4, 2).is_none());
     }
 
     #[test]
     fn length_normal() {
-        let f = length(2, 5);
+        let f = length(2, 5).unwrap();
         assert!(f(String::from("1")).is_err());
         assert!(f(String::from("12")).is_ok());
         assert!(f(String::from("123")).is_ok());
