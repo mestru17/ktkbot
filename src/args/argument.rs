@@ -21,7 +21,7 @@ pub fn log_directory(name: &str) -> Arg {
         .help("Sets the directory to put log files in.")
         .takes_value(true)
         .default_value("logs")
-        .validator(validate::length(1, 64).unwrap())
+        .validator(validate::length(1, 64))
 }
 
 pub fn pushover_api_key(name: &str) -> Arg {
@@ -50,7 +50,7 @@ pub fn events_file(name: &str) -> Arg {
         .help("Sets the file to save events to.")
         .takes_value(true)
         .default_value("events.json")
-        .validator(validate::length(1, 64).unwrap())
+        .validator(validate::length(1, 64))
 }
 
 pub fn fetch_interval(name: &str) -> Arg {

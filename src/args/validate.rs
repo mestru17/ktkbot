@@ -1,12 +1,30 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 
-pub fn length(min: usize, max: usize) -> Option<impl Fn(String) -> Result<(), String>> {
-    if max < min {
-        return None;
+/// Creates a closure for validating the length of given strings.
+///
+/// Because this function panics, it is the caller's job to ensure that `min <= max`.
+///
+/// # Panics
+///
+/// Panics if the [`min`] value is greater than the [`max`] value.
+///
+/// # Examples
+///
+/// ```ignore
+/// let validate = length(2, 4);
+/// assert!(validate(String::from("1")).is_err());
+/// assert!(validate(String::from("12")).is_ok());
+/// assert!(validate(String::from("123")).is_ok());
+/// assert!(validate(String::from("1234")).is_ok());
+/// assert!(validate(String::from("12345")).is_err());
+/// ```
+pub fn length(min: usize, max: usize) -> impl Fn(String) -> Result<(), String> {
+    if min > max {
+        panic!("length max must be greater than or equal to min.");
     }
 
-    Some(move |s: String| {
+    move |s| {
         if s.len() < min || s.len() > max {
             return Err(format!(
                 "Invalid length - must be between {} and {} (inclusive) characters long",
@@ -14,9 +32,26 @@ pub fn length(min: usize, max: usize) -> Option<impl Fn(String) -> Result<(), St
             ));
         }
         Ok(())
-    })
+    }
 }
 
+/// Checks that a given string is a valid Pushover key.
+///
+/// # Examples
+///
+/// ```ignore
+/// let too_short = String::from("29charactersdfghjklzxcvbnm012");
+/// assert!(validate::pushover_key(too_short).is_err());
+///
+/// let too_long = String::from("31charactersdfghjklzxcvbnm01234");
+/// assert!(validate::pushover_key(too_long).is_err());
+///
+/// let invalid_character = String::from("invalidiop!sdfghjklzxcvbnm0123");
+/// assert!(validate::pushover_key(invalid_character).is_err());
+///
+/// let valid = String::from("qwertyuiopasdfghjklzxcvbnm0123");
+/// assert!(validate::pushover_key(valid).is_ok());
+/// ```
 pub fn pushover_key(s: String) -> Result<(), String> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"^[a-z0-9]{30}$").unwrap();
@@ -30,6 +65,23 @@ pub fn pushover_key(s: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Checks that a given string is a valid unsigned integer.
+///
+/// # Examples
+///
+/// ```ignore
+/// let too_short = String::from("");
+/// assert!(validate::uint(too_short).is_err());
+///
+/// let too_long = String::from("12345678901234567890");
+/// assert!(validate::uint(too_long).is_err());
+///
+/// let invalid_character = String::from("-5435");
+/// assert!(validate::uint(invalid_character).is_err());
+///
+/// let valid = String::from("1234567890123456789");
+/// assert!(validate::uint(valid).is_ok());
+/// ```
 pub fn uint(s: String) -> Result<(), String> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"^[0-9]{1, 19}$").unwrap();
@@ -46,56 +98,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn length_range() {
-        assert!(length(0, 2).is_some());
-        assert!(length(1, 2).is_some());
-        assert!(length(2, 2).is_some());
-        assert!(length(3, 2).is_none());
-        assert!(length(4, 2).is_none());
+    #[should_panic]
+    fn length_invalid() {
+        let _validate = length(4, 3);
     }
 
     #[test]
-    fn length_normal() {
-        let f = length(2, 5).unwrap();
-        assert!(f(String::from("1")).is_err());
-        assert!(f(String::from("12")).is_ok());
-        assert!(f(String::from("123")).is_ok());
-        assert!(f(String::from("1234")).is_ok());
-        assert!(f(String::from("12345")).is_ok());
-        assert!(f(String::from("123456")).is_err());
+    fn length_valid() {
+        let validate = length(2, 4);
+        assert!(validate(String::from("1")).is_err());
+        assert!(validate(String::from("12")).is_ok());
+        assert!(validate(String::from("123")).is_ok());
+        assert!(validate(String::from("1234")).is_ok());
+        assert!(validate(String::from("12345")).is_err());
     }
 
     #[test]
-    fn pushover_key_length() {
-        assert!(pushover_key(String::from("tooshortopasdfghjklzxcvbnm012")).is_err());
-        assert!(pushover_key(String::from("validlengthsdfghjklzxcvbnm0123")).is_ok());
-        assert!(pushover_key(String::from("toolongggthsdfghjklzxcvbnm01234")).is_err());
+    fn pushover_key_test() {
+        let too_short = String::from("29charactersdfghjklzxcvbnm012");
+        assert!(pushover_key(too_short).is_err());
+
+        let too_long = String::from("31charactersdfghjklzxcvbnm01234");
+        assert!(pushover_key(too_long).is_err());
+
+        let invalid_character = String::from("invalidiop!sdfghjklzxcvbnm0123");
+        assert!(pushover_key(invalid_character).is_err());
+
+        let valid = String::from("qwertyuiopasdfghjklzxcvbnm0123");
+        assert!(pushover_key(valid).is_ok());
     }
 
     #[test]
-    fn pushover_key_characters() {
-        assert!(pushover_key(String::from("invalidiop!sdfghjklzxcvbnm0123")).is_err());
-        assert!(pushover_key(String::from("invalidiopasdfghj&lzxcvbnm0123")).is_err());
-        assert!(pushover_key(String::from("invalid#¤%&/()=?@£$€xcvbnm0123")).is_err());
-        assert!(pushover_key(String::from("qwertyuiopasdfghjklzxcvbnm0123")).is_ok());
-    }
+    fn uint_test() {
+        let too_short = String::from("");
+        assert!(uint(too_short).is_err());
 
-    #[test]
-    fn uint_length() {
-        assert!(uint(String::from("")).is_err());
-        assert!(uint(String::from("1")).is_ok());
-        assert!(uint(String::from("12")).is_ok());
-        assert!(uint(String::from("1234")).is_ok());
-        assert!(uint(String::from("12345678")).is_ok());
-        assert!(uint(String::from("1234567890123456789")).is_ok());
-        assert!(uint(String::from("12345678901234567890")).is_err());
-    }
+        let too_long = String::from("12345678901234567890");
+        assert!(uint(too_long).is_err());
 
-    #[test]
-    fn uint_characters() {
-        assert!(uint(String::from("invalid")).is_err());
-        assert!(uint(String::from("01234!6789")).is_err());
-        assert!(uint(String::from("012#456789")).is_err());
-        assert!(uint(String::from("0123456789")).is_ok());
+        let invalid_character = String::from("-5435");
+        assert!(uint(invalid_character).is_err());
+
+        let valid = String::from("1234567890123456789");
+        assert!(uint(valid).is_ok());
     }
 }

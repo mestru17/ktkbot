@@ -1,58 +1,11 @@
 mod argument;
 mod validate;
 
-use std::{
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
 
 use clap::{crate_authors, crate_name, crate_version, App, ArgMatches};
 
-#[derive(Debug)]
-pub struct Config {
-    pub log: LogConfig,
-    pub pushover: PushoverConfig,
-    events_file: PathBuf,
-    pub fetch_interval: Duration,
-}
-
-impl Config {
-    pub fn events_file(&self) -> &Path {
-        &self.events_file.as_path()
-    }
-}
-
-#[derive(Debug)]
-pub struct LogConfig {
-    level: String,
-    directory: PathBuf,
-}
-
-impl LogConfig {
-    pub fn level(&self) -> &str {
-        self.level.as_str()
-    }
-
-    pub fn directory(&self) -> &Path {
-        &self.directory.as_path()
-    }
-}
-
-#[derive(Debug)]
-pub struct PushoverConfig {
-    api_key: String,
-    group_key: String,
-}
-
-impl PushoverConfig {
-    pub fn api_key(&self) -> &str {
-        self.api_key.as_str()
-    }
-
-    pub fn group_key(&self) -> &str {
-        self.group_key.as_str()
-    }
-}
+use crate::{Config, LogConfig, PushoverConfig};
 
 pub fn parse_config() -> Config {
     const LOG_LEVEL_NAME: &str = "log_level";

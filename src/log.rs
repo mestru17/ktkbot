@@ -2,12 +2,12 @@ use flexi_logger::{
     Age, Cleanup, Criterion, Duplicate, FileSpec, FlexiLoggerError, Logger, LoggerHandle, Naming,
 };
 
-use crate::args::LogConfig;
+use std::path::Path;
 
-pub fn init_logger(config: &LogConfig) -> Result<LoggerHandle, FlexiLoggerError> {
-    Logger::try_with_env_or_str(config.level())?
+pub fn init_logger(level: &str, directory: &Path) -> Result<LoggerHandle, FlexiLoggerError> {
+    Logger::try_with_env_or_str(level)?
         .format(flexi_logger::colored_detailed_format)
-        .log_to_file(FileSpec::default().directory(&config.directory()))
+        .log_to_file(FileSpec::default().directory(directory))
         .duplicate_to_stdout(Duplicate::Info)
         .print_message()
         .rotate(
