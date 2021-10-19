@@ -1,21 +1,24 @@
 pub mod args;
 mod event;
 mod log;
-mod notification;
+pub mod notification;
+mod validate;
 
-use log_extern::{error, info, warn};
-use notification::Notification;
-use reqwest::blocking::Response;
 use std::{
     path::{Path, PathBuf},
     thread,
     time::Duration,
 };
 
+use flexi_logger;
+use log_extern::{error, info, warn};
+use reqwest::blocking::Response;
+
 use event::{
     fetch::{EventFetcher, FetchError},
     Event,
 };
+use notification::{Notification, PushoverKey};
 
 #[derive(Debug)]
 pub struct Config {
@@ -33,13 +36,13 @@ impl Config {
 
 #[derive(Debug)]
 pub struct LogConfig {
-    level: String,
+    level: flexi_logger::Level,
     directory: PathBuf,
 }
 
 impl LogConfig {
-    pub fn level(&self) -> &str {
-        self.level.as_str()
+    pub fn level(&self) -> &flexi_logger::Level {
+        &self.level
     }
 
     pub fn directory(&self) -> &Path {
@@ -49,18 +52,8 @@ impl LogConfig {
 
 #[derive(Debug)]
 pub struct PushoverConfig {
-    api_key: String,
-    group_key: String,
-}
-
-impl PushoverConfig {
-    pub fn api_key(&self) -> &str {
-        self.api_key.as_str()
-    }
-
-    pub fn group_key(&self) -> &str {
-        self.group_key.as_str()
-    }
+    api_key: PushoverKey,
+    group_key: PushoverKey,
 }
 
 pub fn run(config: &Config) {
@@ -186,7 +179,7 @@ fn send_push_notification(
             .as_str(),
         );
     }
-    Notification::new(config.api_key(), config.group_key(), &message[..])
+    Notification::new(&config.api_key, &config.group_key, &message[..])
         .title("Nye tider lagt op!")
         .html(true)
         .send()

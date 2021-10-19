@@ -1,5 +1,9 @@
+mod pushover_key;
+
 use reqwest::blocking::{Client, Response};
 use serde::Serialize;
+
+pub use self::pushover_key::{PushoverKey, PushoverKeyError};
 
 const PUSHOVER_API_URL: &str = "https://api.pushover.net/1/messages.json";
 
@@ -14,10 +18,10 @@ pub struct Notification<'a> {
 }
 
 impl<'a> Notification<'a> {
-    pub fn new(api_key: &'a str, group_key: &'a str, message: &'a str) -> Self {
+    pub fn new(api_key: &'a PushoverKey, group_key: &'a PushoverKey, message: &'a str) -> Self {
         Notification {
-            token: api_key,
-            user: group_key,
+            token: api_key.get(),
+            user: group_key.get(),
             title: None,
             message,
             html: None,
