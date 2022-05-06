@@ -2,7 +2,7 @@
 #+DESCRIPTION: Readme for ktkbot.
 #+AUTHOR: Mathias Estrup
 
-ktkbot is bot that sends push notifications when new tennis events are put up for Kløvermarkens Tennis Klub (KTK).
+ktkbot is a bot that sends push notifications when new tennis events are put up for Kløvermarkens Tennis Klub (KTK).
 
 KTK has no automatic notification system for when new events (i.e. training lessons) are made available on the booking website. Joining events requires doing so before the number of available spots fill up. By getting these notifications, you gain the advantage of knowing immediately when events become available.
 
