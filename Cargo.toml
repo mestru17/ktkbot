@@ -16,5 +16,5 @@ log_extern = { package = "log", version = "0.4.14" }
 flexi_logger = "0.18.0"
 chrono = { version = "0.4.19", features = ["serde"] }
 clap = "2.33.3"
-regex = "1.5.4"
+regex = "1.5.5"
 lazy_static = "1.4.0"
