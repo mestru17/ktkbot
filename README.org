@@ -40,7 +40,7 @@ By passing the ~--help~ flag, you can also get a more in-depth usage description
 #+begin_src bash
 $ ktkbot --help
 ktkbot 0.12.0
-mestru17
+Mathias Estrup
 Sends KTK event push notifications.
 
 USAGE:
@@ -54,7 +54,8 @@ OPTIONS:
     -e, --events-file <FILE>           Sets the file to save events to. [default: events.json]
     -f, --fetch-interval <SECONDS>     Sets the delay in between fetching events. [default: 120]
     -d, --log-directory <DIRECTORY>    Sets the directory to put log files in. [default: logs]
-    -l, --log-level <LOG LEVEL>        Sets the level of logging. [default: info]  [possible values: info, warn, error]
+    -l, --log-level <LOG LEVEL>        Sets the level of logging. [default: info]  [possible values: error, warn, info,
+                                       debug, trace]
 
 ARGS:
     <PUSHOVER API KEY>      The API key to use for sending Pushover notifications.
